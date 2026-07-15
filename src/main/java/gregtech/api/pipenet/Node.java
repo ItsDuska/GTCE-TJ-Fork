@@ -20,13 +20,18 @@ public final class Node<NodeDataType> {
      * Nodes can connect only if their marks are equal, or if
      * one of marks is default one
      */
+
+    public int forcedConnections;
+
+
     public int mark;
     public boolean isActive;
 
-    public Node(NodeDataType data, int blockedConnections, int mark, boolean isActive) {
+    public Node(NodeDataType data, int blockedConnections, int mark, int forcedConnections ,boolean isActive) {
         this.data = data;
         this.blockedConnections = blockedConnections;
         this.mark = mark;
+        this.forcedConnections = forcedConnections;
         this.isActive = isActive;
     }
 }

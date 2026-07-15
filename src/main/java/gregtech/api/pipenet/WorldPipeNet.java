@@ -38,15 +38,25 @@ public abstract class WorldPipeNet<NodeDataType, T extends PipeNet<NodeDataType>
         this.pipeNets.forEach(PipeNet::onConnectionsUpdate);
     }
 
-    public void addNode(BlockPos nodePos, NodeDataType nodeData, int mark, int blockedConnections, boolean isActive) {
+    public void addNode(BlockPos nodePos, NodeDataType nodeData, int mark, int blockedConnections, int forcedConnections, boolean isActive) {
+        T existingNet = getNetFromPos(nodePos);
+        if (existingNet != null) {
+            Node<NodeDataType> existing = existingNet.getNodeAt(nodePos);
+            existing.blockedConnections = blockedConnections;
+            existing.forcedConnections = forcedConnections;
+            existing.mark = mark;
+            existing.isActive = isActive;
+            return;
+        }
+
         T myPipeNet = null;
-        Node<NodeDataType> node = new Node<>(nodeData, blockedConnections, mark, isActive);
+        Node<NodeDataType> node = new Node<>(nodeData, blockedConnections, forcedConnections, mark, isActive);
         for (EnumFacing facing : EnumFacing.VALUES) {
             BlockPos offsetPos = nodePos.offset(facing);
             T pipeNet = getNetFromPos(offsetPos);
             Node<NodeDataType> secondNode = pipeNet == null ? null : pipeNet.getAllNodes().get(offsetPos);
             if (pipeNet != null && pipeNet.canAttachNode(nodeData) &&
-                pipeNet.canNodesConnect(secondNode, facing.getOpposite(), node, null)) {
+                    pipeNet.canNodesConnect(secondNode, facing.getOpposite(), node, null)) {
                 if (myPipeNet == null) {
                     myPipeNet = pipeNet;
                     myPipeNet.addNode(nodePos, node);
@@ -54,13 +64,19 @@ public abstract class WorldPipeNet<NodeDataType, T extends PipeNet<NodeDataType>
                     myPipeNet.uniteNetworks(pipeNet);
                 }
             }
-
         }
         if (myPipeNet == null) {
             myPipeNet = createNetInstance();
             myPipeNet.addNode(nodePos, node);
             addPipeNet(myPipeNet);
             markDirty();
+        }
+    }
+
+    public void updateForcedConnections(BlockPos nodePos, EnumFacing side, boolean isForced) {
+        T pipeNet = getNetFromPos(nodePos);
+        if (pipeNet != null) {
+            pipeNet.updateForcedConnections(nodePos, side, isForced);
         }
     }
 

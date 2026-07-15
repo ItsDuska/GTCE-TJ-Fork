@@ -8,6 +8,8 @@ import gregtech.api.cover.ICoverable.PrimaryBoxData;
 import gregtech.api.items.metaitem.MetaItem;
 import gregtech.api.items.metaitem.stats.IItemBehaviour;
 import gregtech.api.metatileentity.MetaTileEntityHolder;
+import gregtech.api.pipenet.block.BlockPipe;
+import gregtech.api.pipenet.tile.IPipeTile;
 import gregtech.common.items.behaviors.CoverPlaceBehavior;
 import gregtech.common.items.behaviors.CrowbarBehaviour;
 import net.minecraft.block.state.IBlockState;
@@ -52,7 +54,8 @@ public class WrenchOverlayRenderer {
         TileEntity tileEntity = world.getTileEntity(pos);
         ItemStack heldItem = player.getHeldItem(EnumHand.MAIN_HAND);
 
-        if (tileEntity != null && shouldDrawOverlayForItem(heldItem, tileEntity) && useGridForRayTraceResult(target)) {
+        if (tileEntity != null && shouldDrawOverlayForItem(heldItem, tileEntity)
+                && (tileEntity instanceof IPipeTile || useGridForRayTraceResult(target))) {
             EnumFacing facing = target.sideHit;
             GlStateManager.enableBlend();
             GlStateManager.tryBlendFuncSeparate(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA, GlStateManager.SourceFactor.ONE, GlStateManager.DestFactor.ZERO);
@@ -96,6 +99,12 @@ public class WrenchOverlayRenderer {
         if(tileEntity instanceof MetaTileEntityHolder &&
             itemStack.hasCapability(GregtechCapabilities.CAPABILITY_WRENCH, null)) {
             return true;
+        }
+        if (tileEntity instanceof IPipeTile) {
+            BlockPipe<?, ?, ?> pipeBlock = ((IPipeTile<?, ?>) tileEntity).getPipeBlock();
+            if (pipeBlock != null && itemStack.hasCapability(pipeBlock.getConnectionToggleCapability(), null)) {
+                return true;
+            }
         }
         if(tileEntity.hasCapability(GregtechTileCapabilities.CAPABILITY_COVERABLE, null)) {
             if(itemStack.hasCapability(GregtechCapabilities.CAPABILITY_SCREWDRIVER, null)) {

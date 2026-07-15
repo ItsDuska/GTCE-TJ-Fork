@@ -35,6 +35,8 @@ public abstract class TileEntityPipeBase<PipeType extends Enum<PipeType> & IPipe
     private PipeType pipeType = getPipeTypeClass().getEnumConstants()[0];
     private boolean detachedConversionMode;
     private boolean wasInDetachedConversionMode;
+    private int forcedConnections = 0;
+    private int extendedConnections = 0;
 
     public TileEntityPipeBase() {
     }
@@ -64,6 +66,12 @@ public abstract class TileEntityPipeBase<PipeType extends Enum<PipeType> & IPipe
         if (tileEntity instanceof TileEntityPipeBase) {
             this.updates.putAll(((TileEntityPipeBase<?, ?>) tileEntity).updates);
         }
+
+        for (EnumFacing side : EnumFacing.VALUES) {
+            if (tileEntity.isConnectionForced(side)) this.forcedConnections |= 1 << side.getIndex();
+            if (tileEntity.isConnectionExtended(side)) this.extendedConnections |= 1 << side.getIndex();
+        }
+
         tileEntity.getCoverableImplementation().transferDataTo(coverableImplementation);
         recomputeBlockedConnections();
     }
@@ -121,6 +129,11 @@ public abstract class TileEntityPipeBase<PipeType extends Enum<PipeType> & IPipe
     }
 
     @Override
+    public int getForcedConnections() {
+        return forcedConnections;
+    }
+
+    @Override
     public TIntIntMap getBlockedConnectionsMap() {
         return new TIntIntHashMap(blockedConnectionsMap);
     }
@@ -171,15 +184,18 @@ public abstract class TileEntityPipeBase<PipeType extends Enum<PipeType> & IPipe
     }
 
     private void updateSideBlockedConnection(EnumFacing side) {
-        if (!detachedConversionMode) {
-            WorldPipeNet<?, ?> worldPipeNet = getPipeBlock().getWorldPipeNet(getWorld());
-            boolean isSideBlocked = false;
-            int sideIndex = 1 << side.getIndex();
-            for(int blockedConnections : blockedConnectionsMap.values()) {
-                isSideBlocked |= (blockedConnections & sideIndex) > 0;
-            }
-            worldPipeNet.updateBlockedConnections(getPos(), side, isSideBlocked);
+        if (detachedConversionMode) {
+            return;
         }
+
+        WorldPipeNet<?, ?> worldPipeNet = getPipeBlock().getWorldPipeNet(getWorld());
+        boolean isSideBlocked = false;
+        int sideIndex = 1 << side.getIndex();
+        for(int blockedConnections : blockedConnectionsMap.values()) {
+            isSideBlocked |= (blockedConnections & sideIndex) > 0;
+        }
+        worldPipeNet.updateBlockedConnections(getPos(), side, isSideBlocked);
+
     }
 
     private int withSideConnectionBlocked(int blockedConnections, EnumFacing side, boolean blocked) {
@@ -226,7 +242,8 @@ public abstract class TileEntityPipeBase<PipeType extends Enum<PipeType> & IPipe
         }
         if(coverBehavior == null && facing != null) {
             boolean isBlocked = (getBlockedConnections() & 1 << facing.getIndex()) > 0;
-            return isBlocked ? null : defaultValue;
+            boolean isForced = isConnectionForced(facing);
+            return (isBlocked || !isForced) ? null : defaultValue;
         }
         if (coverBehavior != null) {
             return coverBehavior.getCapability(capability, defaultValue);
@@ -254,7 +271,9 @@ public abstract class TileEntityPipeBase<PipeType extends Enum<PipeType> & IPipe
             blockedConnectionsTag.setInteger(Integer.toString(attachmentType), blockedConnections);
         }
         compound.setTag("BlockedConnectionsMap", blockedConnectionsTag);
+        compound.setInteger("ForcedConnections", forcedConnections);
         compound.setInteger("InsulationColor", insulationColor);
+        compound.setInteger("ExtendedConnections", extendedConnections);
         this.coverableImplementation.writeToNBT(compound);
         return compound;
     }
@@ -276,7 +295,9 @@ public abstract class TileEntityPipeBase<PipeType extends Enum<PipeType> & IPipe
             this.blockedConnectionsMap.put(attachmentType, blockedConnections);
         }
         recomputeBlockedConnections();
+        this.forcedConnections = compound.getInteger("ForcedConnections");
         this.insulationColor = compound.getInteger("InsulationColor");
+        this.extendedConnections = compound.getInteger("ExtendedConnections");
         this.coverableImplementation.readFromNBT(compound);
     }
 
@@ -298,7 +319,9 @@ public abstract class TileEntityPipeBase<PipeType extends Enum<PipeType> & IPipe
     public void writeInitialSyncData(PacketBuffer buf) {
         writePipeProperties(buf);
         buf.writeVarInt(blockedConnections);
+        buf.writeVarInt(forcedConnections);
         buf.writeInt(insulationColor);
+        buf.writeVarInt(extendedConnections);
         this.coverableImplementation.writeInitialSyncData(buf);
     }
 
@@ -306,7 +329,9 @@ public abstract class TileEntityPipeBase<PipeType extends Enum<PipeType> & IPipe
     public void receiveInitialSyncData(PacketBuffer buf) {
         readPipeProperties(buf);
         this.blockedConnections = buf.readVarInt();
+        this.forcedConnections = buf.readVarInt();
         this.insulationColor = buf.readInt();
+        this.extendedConnections = buf.readVarInt();
         this.coverableImplementation.readInitialSyncData(buf);
     }
 
@@ -322,6 +347,13 @@ public abstract class TileEntityPipeBase<PipeType extends Enum<PipeType> & IPipe
             this.coverableImplementation.readCustomData(buf.readVarInt(), buf);
         } else if(discriminator == -4) {
             readPipeProperties(buf);
+            scheduleChunkForRenderUpdate();
+        } else if (discriminator == -6) {
+            this.forcedConnections = buf.readVarInt();
+            scheduleChunkForRenderUpdate();
+        }
+        else if (discriminator == -7) {
+            this.extendedConnections = buf.readVarInt();
             scheduleChunkForRenderUpdate();
         }
     }
@@ -361,5 +393,47 @@ public abstract class TileEntityPipeBase<PipeType extends Enum<PipeType> & IPipe
     @Override
     public boolean shouldRefresh(World world, BlockPos pos, IBlockState oldState, IBlockState newSate) {
         return oldState.getBlock() != newSate.getBlock();
+    }
+
+    @Override
+    public boolean isConnectionForced(EnumFacing side) {
+        return (forcedConnections & (1 << side.getIndex())) > 0;
+    }
+
+    @Override
+    public void setConnectionForced(EnumFacing side, boolean forced) {
+        if (forced) forcedConnections |= 1 << side.getIndex();
+        else forcedConnections &= ~(1 << side.getIndex());
+
+        if (getWorld().isRemote) {
+            return;
+        }
+
+        writeCustomData(-6, buffer -> buffer.writeVarInt(forcedConnections));
+        markDirty();
+        notifyBlockUpdate();
+        scheduleChunkForRenderUpdate();
+
+        if (!detachedConversionMode) {
+            getPipeBlock().getWorldPipeNet(getWorld()).updateForcedConnections(getPos(), side, forced);
+        }
+    }
+
+    public boolean isConnectionExtended(EnumFacing side) {
+        return (extendedConnections & (1 << side.getIndex())) > 0;
+    }
+
+    public void setConnectionExtended(EnumFacing side, boolean extended) {
+        if (extended) extendedConnections |= 1 << side.getIndex();
+        else extendedConnections &= ~(1 << side.getIndex());
+        if (!getWorld().isRemote) {
+            writeCustomData(-7, buffer -> buffer.writeVarInt(extendedConnections));
+            markDirty();
+            scheduleChunkForRenderUpdate();
+        }
+    }
+
+    public int getExtendedConnections() {
+        return extendedConnections;
     }
 }

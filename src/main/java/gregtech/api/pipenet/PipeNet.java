@@ -240,8 +240,14 @@ public abstract class PipeNet<NodeDataType> implements INBTSerializable<NBTTagCo
     }
 
     private boolean areNodeBlockedConnectionsCompatible(Node<NodeDataType> first, EnumFacing firstFacing, Node<NodeDataType> second) {
-        return (first.blockedConnections & 1 << firstFacing.getIndex()) == 0 &&
-            (second.blockedConnections & 1 << firstFacing.getOpposite().getIndex()) == 0;
+        boolean firstBlocked = (first.blockedConnections & 1 << firstFacing.getIndex()) != 0;
+        boolean secondBlocked = (second.blockedConnections & 1 << firstFacing.getOpposite().getIndex()) != 0;
+        if (firstBlocked || secondBlocked) {
+            return false;
+        }
+        boolean firstForced = (first.forcedConnections & 1 << firstFacing.getIndex()) != 0;
+        boolean secondForced = (second.forcedConnections & 1 << firstFacing.getOpposite().getIndex()) != 0;
+        return firstForced || secondForced;
     }
 
     private boolean areMarksCompatible(int mark1, int mark2) {
@@ -333,6 +339,7 @@ public abstract class PipeNet<NodeDataType> implements INBTSerializable<NBTTagCo
         return true;
     }
 
+
     protected boolean canAttachNode(NodeDataType nodeData) {
         return true;
     }
@@ -397,9 +404,10 @@ public abstract class PipeNet<NodeDataType> implements INBTSerializable<NBTTagCo
             BlockPos blockPos = new BlockPos(x, y, z);
             NodeDataType nodeData = readProperties.get(wirePropertiesIndex);
             int blockedConnections = nodeTag.getInteger("blocked");
+            int forcedConnections = nodeTag.getInteger("forced");
             int mark = nodeTag.getInteger("mark");
             boolean isNodeActive = nodeTag.getBoolean("active");
-            addNodeSilently(blockPos, new Node<>(nodeData, blockedConnections, mark, isNodeActive));
+            addNodeSilently(blockPos, new Node<>(nodeData, blockedConnections, mark, forcedConnections ,isNodeActive));
         }
     }
 
@@ -430,6 +438,11 @@ public abstract class PipeNet<NodeDataType> implements INBTSerializable<NBTTagCo
             if (node.blockedConnections > 0) {
                 nodeTag.setInteger("blocked", node.blockedConnections);
             }
+
+            if (node.forcedConnections > 0) {
+                nodeTag.setInteger("forced", node.forcedConnections);
+            }
+
             if (node.isActive) {
                 nodeTag.setBoolean("active", true);
             }
@@ -447,6 +460,56 @@ public abstract class PipeNet<NodeDataType> implements INBTSerializable<NBTTagCo
         compound.setTag("NodeIndexes", allNodesList);
         compound.setTag("WireProperties", wirePropertiesList);
         return compound;
+    }
+
+
+    protected void updateForcedConnections(BlockPos nodePos, EnumFacing facing, boolean isForced) {
+        if (!containsNode(nodePos)) {
+            return;
+        }
+        Node<NodeDataType> selfNode = getNodeAt(nodePos);
+        boolean wasForced = (selfNode.forcedConnections & 1 << facing.getIndex()) > 0;
+        if (wasForced == isForced) {
+            return;
+        }
+        setForced(selfNode, facing, isForced);
+        BlockPos offsetPos = nodePos.offset(facing);
+        PipeNet<NodeDataType> pipeNetAtOffset = worldData.getNetFromPos(offsetPos);
+        if (pipeNetAtOffset == null) {
+            return;
+        }
+        if (pipeNetAtOffset == this) {
+            if (!isForced) {
+                setForced(selfNode, facing, true);
+                boolean wasConnected = canNodesConnect(selfNode, facing, getNodeAt(offsetPos), this);
+                setForced(selfNode, facing, false);
+                if (wasConnected) {
+                    HashMap<BlockPos, Node<NodeDataType>> thisNet = findAllConnectedBlocks(nodePos);
+                    if (!getAllNodes().equals(thisNet)) {
+                        PipeNet<NodeDataType> newPipeNet = worldData.createNetInstance();
+                        thisNet.keySet().forEach(this::removeNodeWithoutRebuilding);
+                        newPipeNet.transferNodeData(thisNet, this);
+                        worldData.addPipeNet(newPipeNet);
+                    }
+                }
+            }
+        } else if (isForced) {
+            Node<NodeDataType> neighbourNode = pipeNetAtOffset.getNodeAt(offsetPos);
+            if (canNodesConnect(selfNode, facing, neighbourNode, pipeNetAtOffset) &&
+                    pipeNetAtOffset.canNodesConnect(neighbourNode, facing.getOpposite(), selfNode, this)) {
+                uniteNetworks(pipeNetAtOffset);
+            }
+        }
+        onConnectionsUpdate();
+        worldData.markDirty();
+    }
+
+    private void setForced(Node<NodeDataType> node, EnumFacing facing, boolean isForced) {
+        if (isForced) {
+            node.forcedConnections |= 1 << facing.getIndex();
+        } else {
+            node.forcedConnections &= ~(1 << facing.getIndex());
+        }
     }
 
 }

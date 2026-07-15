@@ -253,6 +253,7 @@ public class ClientProxy extends CommonProxy {
         TJcapeHoldersUUIDs.add(UUID.fromString("0c9b375b-7326-4935-a529-35408aa3e1a6"));
         TJcapeHoldersUUIDs.add(UUID.fromString("886dc825-dde6-4457-9dec-2c6cb860126d"));
         TJcapeHoldersUUIDs.add(UUID.fromString("98f92fb9-a4fc-4232-8420-4716d319e0b9"));
+        TJcapeHoldersUUIDs.add(UUID.fromString("aee4d640-76b6-4ff0-9cf9-fc088993e4e4"));
         try {
             URL connectURL = new URL("https://www.dropbox.com/s/zc07k4y1h4ftmz3/GregTechPatreonList.txt?dl=1");
             HttpURLConnection connection = (HttpURLConnection) connectURL.openConnection(Minecraft.getMinecraft().getProxy());

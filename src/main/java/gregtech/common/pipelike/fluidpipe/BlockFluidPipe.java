@@ -85,10 +85,6 @@ public class BlockFluidPipe extends BlockMaterialPipe<FluidPipeType, FluidPipePr
         }
     }
 
-    @Override
-    protected boolean canPipesConnect(IPipeTile<FluidPipeType, FluidPipeProperties> selfTile, EnumFacing side, IPipeTile<FluidPipeType, FluidPipeProperties> sideTile) {
-        return selfTile.getNodeData().equals(sideTile.getNodeData());
-    }
 
     @Override
     protected int getActiveVisualConnections(IPipeTile<FluidPipeType, FluidPipeProperties> selfTile) {
@@ -96,13 +92,12 @@ public class BlockFluidPipe extends BlockMaterialPipe<FluidPipeType, FluidPipePr
         for (EnumFacing side : EnumFacing.VALUES) {
             BlockPos offsetPos = selfTile.getPipePos().offset(side);
             TileEntity tileEntity = selfTile.getPipeWorld().getTileEntity(offsetPos);
-            if(tileEntity != null) {
-                EnumFacing opposite = side.getOpposite();
-                IFluidHandler sourceHandler = selfTile.getCapability(CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY, side);
-                IFluidHandler receivedHandler = tileEntity.getCapability(CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY, opposite);
-                if (sourceHandler != null && receivedHandler != null) {
-                    activeNodeConnections |= 1 << side.getIndex();
-                }
+            if (tileEntity == null || getPipeTileEntity(tileEntity) != null) continue;
+            EnumFacing opposite = side.getOpposite();
+            IFluidHandler sourceHandler = getRawFluidHandler(selfTile, side);
+            IFluidHandler receivedHandler = tileEntity.getCapability(CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY, opposite);
+            if (sourceHandler != null && receivedHandler != null) {
+                activeNodeConnections |= 1 << side.getIndex();
             }
         }
         return activeNodeConnections;
@@ -112,18 +107,24 @@ public class BlockFluidPipe extends BlockMaterialPipe<FluidPipeType, FluidPipePr
     public int getActiveNodeConnections(IBlockAccess world, BlockPos nodePos, IPipeTile<FluidPipeType, FluidPipeProperties> selfTileEntity) {
         int activeNodeConnections = 0;
         for (EnumFacing side : EnumFacing.VALUES) {
-            BlockPos offsetPos = nodePos.offset(side);
-            TileEntity tileEntity = world.getTileEntity(offsetPos);
-            if(tileEntity != null) {
-                EnumFacing opposite = side.getOpposite();
-                IFluidHandler sourceHandler = selfTileEntity.getCapability(CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY, side);
-                IFluidHandler receivedHandler = tileEntity.getCapability(CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY, opposite);
-                if (sourceHandler != null && receivedHandler != null && canPushIntoFluidHandler(selfTileEntity, tileEntity, sourceHandler, receivedHandler)) {
-                    activeNodeConnections |= 1 << side.getIndex();
-                }
+            BlockPos offsetPos = selfTileEntity.getPipePos().offset(side);
+            TileEntity tileEntity = selfTileEntity.getPipeWorld().getTileEntity(offsetPos);
+            if (tileEntity == null || getPipeTileEntity(tileEntity) != null) continue;
+            EnumFacing opposite = side.getOpposite();
+            IFluidHandler sourceHandler = getRawFluidHandler(selfTileEntity, side);
+            IFluidHandler receivedHandler = tileEntity.getCapability(CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY, opposite);
+            if (sourceHandler != null && receivedHandler != null) {
+                activeNodeConnections |= 1 << side.getIndex();
             }
         }
         return activeNodeConnections;
+    }
+
+    private IFluidHandler getRawFluidHandler(IPipeTile<FluidPipeType, FluidPipeProperties> pipeTile, EnumFacing side) {
+        if (pipeTile instanceof TileEntityPipeBase) {
+            return ((TileEntityPipeBase<FluidPipeType, FluidPipeProperties>) pipeTile).getCapabilityInternal(CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY, side);
+        }
+        return pipeTile.getCapability(CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY, side);
     }
 
     public boolean canPushIntoFluidHandler(IPipeTile<FluidPipeType, FluidPipeProperties> selfTileEntity, TileEntity otherTileEntity, IFluidHandler sourceHandler, IFluidHandler destinationHandler) {

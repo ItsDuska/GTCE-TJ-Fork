@@ -3,8 +3,12 @@ package gregtech.common.pipelike.cable;
 import com.google.common.base.Preconditions;
 import gregtech.api.capability.GregtechCapabilities;
 import gregtech.api.capability.IEnergyContainer;
+import gregtech.api.capability.tool.IDamagableToolItem;
+import gregtech.api.capability.tool.IWireCutterItem;
 import gregtech.api.damagesources.DamageSources;
 import gregtech.api.pipenet.block.material.BlockMaterialPipe;
+import gregtech.api.pipenet.block.material.IMaterialPipeTile;
+import gregtech.api.pipenet.tile.AttachmentType;
 import gregtech.api.pipenet.tile.IPipeTile;
 import gregtech.api.pipenet.tile.TileEntityPipeBase;
 import gregtech.api.unification.material.type.Material;
@@ -15,20 +19,22 @@ import gregtech.common.pipelike.cable.net.WorldENet;
 import gregtech.common.pipelike.cable.tile.TileEntityCable;
 import gregtech.common.pipelike.cable.tile.TileEntityCableTickable;
 import gregtech.common.render.CableRenderer;
+import gregtech.common.sound.GTSoundEvents;
+import gregtech.common.tools.DamageValues;
 import net.minecraft.block.ITileEntityProvider;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.creativetab.CreativeTabs;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 import net.minecraft.tileentity.TileEntity;
-import net.minecraft.util.EnumBlockRenderType;
-import net.minecraft.util.EnumFacing;
-import net.minecraft.util.NonNullList;
+import net.minecraft.util.*;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.IBlockAccess;
 import net.minecraft.world.World;
+import net.minecraftforge.common.capabilities.Capability;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
 import org.apache.commons.lang3.tuple.Pair;
@@ -86,6 +92,7 @@ public class BlockCable extends BlockMaterialPipe<Insulation, WireProperties, Wo
         }
     }
 
+
     @Override
     public int getActiveNodeConnections(IBlockAccess world, BlockPos nodePos, IPipeTile<Insulation, WireProperties> selfTileEntity) {
         int activeNodeConnections = 0;
@@ -93,7 +100,9 @@ public class BlockCable extends BlockMaterialPipe<Insulation, WireProperties, Wo
             BlockPos offsetPos = nodePos.offset(side);
             TileEntity tileEntity = world.getTileEntity(offsetPos);
             //do not connect to null cables and ignore cables
-            if (tileEntity == null || getPipeTileEntity(tileEntity) != null) continue;
+            if (tileEntity == null || getPipeTileEntity(tileEntity) != null) {
+                continue;
+            }
             EnumFacing opposite = side.getOpposite();
             IEnergyContainer energyContainer = tileEntity.getCapability(GregtechCapabilities.CAPABILITY_ENERGY_CONTAINER, opposite);
             if (energyContainer != null) {
@@ -137,4 +146,20 @@ public class BlockCable extends BlockMaterialPipe<Insulation, WireProperties, Wo
     protected Pair<TextureAtlasSprite, Integer> getParticleTexture(World world, BlockPos blockPos) {
         return CableRenderer.INSTANCE.getParticleTexture((TileEntityCable) world.getTileEntity(blockPos));
     }
+
+    @Override
+    public Capability<? extends IDamagableToolItem> getConnectionToggleCapability() {
+        return GregtechCapabilities.CAPABILITY_WIRE_CUTTER;
+    }
+
+    @Override
+    protected int getConnectionToggleDamage() {
+        return DamageValues.DAMAGE_FOR_WIRE_CUTTER;
+    }
+
+    @Override
+    protected SoundEvent getConnectionToggleSound() {
+        return GTSoundEvents.WIRE_CUTTER;
+    }
+
 }

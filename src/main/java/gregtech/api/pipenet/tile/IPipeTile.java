@@ -64,4 +64,15 @@ public interface IPipeTile<PipeType extends Enum<PipeType> & IPipeType<NodeDataT
     boolean isValidTile();
 
     void scheduleChunkForRenderUpdate();
+
+    boolean isConnectionForced(EnumFacing side);
+
+    void setConnectionForced(EnumFacing side, boolean forced);
+
+    int getExtendedConnections();
+
+    boolean isConnectionExtended(EnumFacing side);
+    void setConnectionExtended(EnumFacing side, boolean extended);
+
+    int getForcedConnections();
 }
