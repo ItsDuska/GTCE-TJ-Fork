@@ -72,7 +72,9 @@ public interface IPipeTile<PipeType extends Enum<PipeType> & IPipeType<NodeDataT
     int getExtendedConnections();
 
     boolean isConnectionExtended(EnumFacing side);
+
     void setConnectionExtended(EnumFacing side, boolean extended);
 
-    int getForcedConnections();
+    boolean isConnectionEnabled(EnumFacing side);
+
 }

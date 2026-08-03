@@ -11,8 +11,10 @@ import codechicken.lib.vec.uv.IconTransformation;
 import codechicken.lib.vec.uv.UVTransformationList;
 import gregtech.api.GTValues;
 import gregtech.api.util.GTLog;
+import gregtech.common.render.CubeRendererState;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.client.renderer.texture.TextureMap;
+import net.minecraft.util.BlockRenderLayer;
 import net.minecraft.util.EnumFacing;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
@@ -192,10 +194,16 @@ public class Textures {
     public static SimpleOverlayRenderer BLOWER_ACTIVE_OVERLAY = new SimpleOverlayRenderer("overlay/machine/overlay_blower_active");
 
 
+    @SideOnly(Side.CLIENT)
+    public static ThreadLocal<CubeRendererState> RENDER_STATE;
+
     static {
         for (int i = 0; i < VOLTAGE_CASINGS.length; i++) {
             String voltageName = GTValues.VN[i].toLowerCase();
             VOLTAGE_CASINGS[i] = new SimpleSidedCubeRenderer("casings/voltage/" + voltageName);
+        }
+        if (GTValues.isClientSide()) {
+            RENDER_STATE = new ThreadLocal<>();
         }
     }
 
@@ -205,6 +213,25 @@ public class Textures {
         for (IIconRegister iconRegister : iconRegisters) {
             iconRegister.registerIcons(textureMap);
         }
+    }
+
+    @SideOnly(Side.CLIENT)
+    public static void renderFace(CCRenderState renderState, Matrix4 translation, IVertexOperation[] ops, EnumFacing face, Cuboid6 bounds, TextureAtlasSprite sprite, BlockRenderLayer layer) {
+        CubeRendererState op = RENDER_STATE.get();
+        if (layer != null && op != null && op.layer != null &&
+                (op.layer != layer || !op.shouldSideBeRendered(face, bounds))) {
+            return;
+        }
+
+        BlockFace blockFace = blockFaces.get();
+        blockFace.loadCuboidFace(bounds, face.getIndex());
+        UVTransformationList uvList = new UVTransformationList(new IconTransformation(sprite));
+        if (face.getIndex() == 0) {
+            uvList.prepend(new UVMirror(0, 0, bounds.min.z, bounds.max.z));
+        }
+        renderState.setPipeline(blockFace, 0, blockFace.verts.length,
+                ArrayUtils.addAll(ops, new TransformationList(translation), uvList));
+        renderState.render();
     }
 
     @SideOnly(Side.CLIENT)

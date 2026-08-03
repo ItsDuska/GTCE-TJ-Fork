@@ -38,19 +38,17 @@ public abstract class WorldPipeNet<NodeDataType, T extends PipeNet<NodeDataType>
         this.pipeNets.forEach(PipeNet::onConnectionsUpdate);
     }
 
-    public void addNode(BlockPos nodePos, NodeDataType nodeData, int mark, int blockedConnections, int forcedConnections, boolean isActive) {
+    public void addNode(BlockPos nodePos, NodeDataType nodeData, int mark, int enabledConnections, boolean isActive) {
         T existingNet = getNetFromPos(nodePos);
         if (existingNet != null) {
             Node<NodeDataType> existing = existingNet.getNodeAt(nodePos);
-            existing.blockedConnections = blockedConnections;
-            existing.forcedConnections = forcedConnections;
+            existing.enabledConnections = enabledConnections;
             existing.mark = mark;
             existing.isActive = isActive;
             return;
         }
-
         T myPipeNet = null;
-        Node<NodeDataType> node = new Node<>(nodeData, blockedConnections, forcedConnections, mark, isActive);
+        Node<NodeDataType> node = new Node<>(nodeData, enabledConnections, mark, isActive);
         for (EnumFacing facing : EnumFacing.VALUES) {
             BlockPos offsetPos = nodePos.offset(facing);
             T pipeNet = getNetFromPos(offsetPos);
@@ -73,12 +71,6 @@ public abstract class WorldPipeNet<NodeDataType, T extends PipeNet<NodeDataType>
         }
     }
 
-    public void updateForcedConnections(BlockPos nodePos, EnumFacing side, boolean isForced) {
-        T pipeNet = getNetFromPos(nodePos);
-        if (pipeNet != null) {
-            pipeNet.updateForcedConnections(nodePos, side, isForced);
-        }
-    }
 
     protected void addPipeNetToChunk(ChunkPos chunkPos, T pipeNet) {
         this.pipeNetsByChunk.computeIfAbsent(chunkPos, any -> new ArrayList<>()).add(pipeNet);
@@ -97,10 +89,10 @@ public abstract class WorldPipeNet<NodeDataType, T extends PipeNet<NodeDataType>
         }
     }
 
-    public void updateBlockedConnections(BlockPos nodePos, EnumFacing side, boolean isBlocked) {
+    public void updateConnectionEnabled(BlockPos nodePos, EnumFacing side, boolean isEnabled) {
         T pipeNet = getNetFromPos(nodePos);
         if (pipeNet != null) {
-            pipeNet.updateBlockedConnections(nodePos, side, isBlocked);
+            pipeNet.updateConnectionEnabled(nodePos, side, isEnabled);
         }
     }
 

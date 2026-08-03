@@ -53,21 +53,19 @@ public class TileEntityFluidPipeTickable extends TileEntityFluidPipe implements 
 
     public static void pushFluidsFromTank(IPipeTile<FluidPipeType, FluidPipeProperties> pipeTile) {
         PooledMutableBlockPos blockPos = PooledMutableBlockPos.retain();
-        int blockedConnections = pipeTile.getBlockedConnections();
-        int forcedConnections = pipeTile.getForcedConnections();
         BlockFluidPipe blockFluidPipe = (BlockFluidPipe) pipeTile.getPipeBlock();
         for (EnumFacing side : EnumFacing.VALUES) {
-            if ((blockedConnections & 1 << side.getIndex()) > 0) {
-                continue; //do not dispatch energy to blocked sides
+            if (!pipeTile.isConnectionEnabled(side)) {
+                continue; // not connected on this side
             }
 
             blockPos.setPos(pipeTile.getPipePos()).move(side);
             if (!pipeTile.getPipeWorld().isBlockLoaded(blockPos)) {
-                continue; //do not allow cables to load chunks
+                continue; // do not allow pipes to load chunks
             }
             TileEntity tileEntity = pipeTile.getPipeWorld().getTileEntity(blockPos);
-            if (tileEntity == null) {
-                continue; //do not emit into multiparts or other fluid pipes
+            if (tileEntity == null || blockFluidPipe.getPipeTileEntity(tileEntity) != null) {
+                continue; // do not emit into multiparts or other fluid pipes — same-net segments already share the tank
             }
             IFluidHandler sourceHandler = pipeTile.getCapability(CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY, side);
             IFluidHandler receiverHandler = tileEntity.getCapability(CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY, side.getOpposite());

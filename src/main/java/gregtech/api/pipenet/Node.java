@@ -14,24 +14,20 @@ public final class Node<NodeDataType> {
      * Node will not connect in blocked direction in any case,
      * even if neighbour node mark matches
      */
-    public int blockedConnections;
+    public int enabledConnections;
     /**
      * Specifies mark of this node
      * Nodes can connect only if their marks are equal, or if
      * one of marks is default one
      */
 
-    public int forcedConnections;
-
-
     public int mark;
     public boolean isActive;
 
-    public Node(NodeDataType data, int blockedConnections, int mark, int forcedConnections ,boolean isActive) {
+    public Node(NodeDataType data, int enabledConnections, int mark, boolean isActive) {
         this.data = data;
-        this.blockedConnections = blockedConnections;
+        this.enabledConnections = enabledConnections;
         this.mark = mark;
-        this.forcedConnections = forcedConnections;
         this.isActive = isActive;
     }
 }

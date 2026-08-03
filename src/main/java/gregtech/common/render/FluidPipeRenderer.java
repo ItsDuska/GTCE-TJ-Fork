@@ -1,7 +1,7 @@
 package gregtech.common.render;
 
 import codechicken.lib.render.BlockRenderer;
-import codechicken.lib.render.CCModel;
+import codechicken.lib.render.BlockRenderer.BlockFace;
 import codechicken.lib.render.CCRenderState;
 import codechicken.lib.render.block.BlockRenderingRegistry;
 import codechicken.lib.render.block.ICCBlockRenderer;
@@ -18,6 +18,7 @@ import codechicken.lib.vec.uv.IconTransformation;
 import gregtech.api.GTValues;
 import gregtech.api.cover.ICoverable;
 import gregtech.api.pipenet.tile.IPipeTile;
+import gregtech.api.render.Textures;
 import gregtech.api.unification.material.type.Material;
 import gregtech.api.util.GTUtility;
 import gregtech.api.util.ModCompatibility;
@@ -57,17 +58,11 @@ import java.util.Map;
 
 public class FluidPipeRenderer implements ICCBlockRenderer, IItemRenderer {
 
-    public static ModelResourceLocation MODEL_LOCATION = new ModelResourceLocation(new ResourceLocation(GTValues.MODID, "fluid_pipe"), "normal");
-    public static FluidPipeRenderer INSTANCE = new FluidPipeRenderer();
+    public static final ModelResourceLocation MODEL_LOCATION = new ModelResourceLocation(new ResourceLocation(GTValues.MODID, "fluid_pipe"), "normal");
+    public static final FluidPipeRenderer INSTANCE = new FluidPipeRenderer();
     public static EnumBlockRenderType BLOCK_RENDER_TYPE;
+    private static final ThreadLocal<BlockFace> blockFaces = ThreadLocal.withInitial(BlockFace::new);
     private Map<FluidPipeType, PipeTextureInfo> pipeTextures = new HashMap<>();
-
-    private static final float DIFFUSE_DOWN = 0.5F;
-    private static final float DIFFUSE_UP = 1.0F;
-    private static final float DIFFUSE_NORTH_SOUTH = 0.8F;
-    private static final float DIFFUSE_EAST_WEST = 0.6F;
-
-    private static final ThreadLocal<BlockRenderer.BlockFace> blockFaces = ThreadLocal.withInitial(BlockRenderer.BlockFace::new);
 
     private static class PipeTextureInfo {
         public final TextureAtlasSprite inTexture;
@@ -112,11 +107,16 @@ public class FluidPipeRenderer implements ICCBlockRenderer, IItemRenderer {
         GlStateManager.enableBlend();
         renderState.reset();
         renderState.startDrawing(GL11.GL_QUADS, DefaultVertexFormats.ITEM);
+
         BlockFluidPipe blockFluidPipe = (BlockFluidPipe) ((ItemBlockFluidPipe) stack.getItem()).getBlock();
         FluidPipeType pipeType = blockFluidPipe.getItemPipeType(stack);
         Material material = blockFluidPipe.getItemMaterial(stack);
+
+
         if (pipeType != null && material != null) {
-            renderPipeBlock(material, pipeType, IPipeTile.DEFAULT_INSULATION_COLOR, renderState, new IVertexOperation[0], null, null,0,0);
+            int connections = 1 << EnumFacing.SOUTH.getIndex() | 1 << EnumFacing.NORTH.getIndex() | 1 << (6 + EnumFacing.SOUTH.getIndex()) | 1 << (6 + EnumFacing.NORTH.getIndex());
+            connections |= 1 << 12;
+            renderPipeBlock(material, pipeType, IPipeTile.DEFAULT_INSULATION_COLOR, renderState, new IVertexOperation[0], connections);
         }
         renderState.draw();
         GlStateManager.disableBlend();
@@ -129,8 +129,8 @@ public class FluidPipeRenderer implements ICCBlockRenderer, IItemRenderer {
         renderState.bind(buffer);
         renderState.setBrightness(world, pos);
 
-        BlockFluidPipe blockPipe = ((BlockFluidPipe) state.getBlock());
-        TileEntityFluidPipe tileEntityPipe = (TileEntityFluidPipe) blockPipe.getPipeTileEntity(world, pos);
+        BlockFluidPipe blockFluidPipe = ((BlockFluidPipe) state.getBlock());
+        TileEntityFluidPipe tileEntityPipe = (TileEntityFluidPipe) blockFluidPipe.getPipeTileEntity(world, pos);
 
         if (tileEntityPipe == null) {
             return false;
@@ -141,160 +141,86 @@ public class FluidPipeRenderer implements ICCBlockRenderer, IItemRenderer {
         int paintingColor = tileEntityPipe.getInsulationColor();
 
 
-
         if (fluidPipeType != null && pipeMaterial != null) {
             BlockRenderLayer renderLayer = MinecraftForgeClient.getRenderLayer();
 
             if (renderLayer == BlockRenderLayer.CUTOUT) {
-                int connectedSidesMask = blockPipe.getActualConnections(tileEntityPipe, world);
 
+                boolean[] sideMask = new boolean[EnumFacing.VALUES.length];
+                for (EnumFacing side : EnumFacing.VALUES) {
+                    sideMask[side.getIndex()] = state.shouldSideBeRendered(world, pos, side);
+                }
 
-                int blockedSidesMask = tileEntityPipe.getBlockedConnections();
+                Textures.RENDER_STATE.set(new CubeRendererState(renderLayer, sideMask, world));
 
-                IVertexOperation[] pipeline = new IVertexOperation[0];
+                int connectedSidesMask = blockFluidPipe.getActualConnections(tileEntityPipe, world);
 
-                renderPipeBlock(pipeMaterial, fluidPipeType, paintingColor, renderState, pipeline, world, pos,connectedSidesMask, blockedSidesMask);
+                renderState.lightMatrix.locate(world, pos);
+                IVertexOperation[] pipeline = new IVertexOperation[]{new Translation(pos), renderState.lightMatrix};
+                renderPipeBlock(pipeMaterial, fluidPipeType, paintingColor, renderState, pipeline, connectedSidesMask);
             }
-
 
             ICoverable coverable = tileEntityPipe.getCoverableImplementation();
             coverable.renderCovers(renderState, new Matrix4().translate(pos.getX(), pos.getY(), pos.getZ()), renderLayer);
+            Textures.RENDER_STATE.remove();
         }
         return true;
     }
 
     private int getPipeColor(Material material, int insulationColor) {
-        if(insulationColor == IPipeTile.DEFAULT_INSULATION_COLOR) {
+        if (insulationColor == IPipeTile.DEFAULT_INSULATION_COLOR) {
             return material.materialRGB;
         } else return insulationColor;
     }
 
-    public boolean renderPipeBlock(Material material, FluidPipeType pipeType, int insulationColor,
-                                   CCRenderState state, IVertexOperation[] pipeline,
-                                   IBlockAccess world, BlockPos pos, int connectMask, int blockedMask) {
-
+    public void renderPipeBlock(Material material, FluidPipeType pipeType, int insulationColor, CCRenderState state, IVertexOperation[] pipeline, int connectMask) {
         int pipeColor = GTUtility.convertRGBtoOpaqueRGBA_CL(getPipeColor(material, insulationColor));
-        ColourMultiplier multiplier = new ColourMultiplier(pipeColor);
-
-        PipeTextureInfo textureInfo = this.pipeTextures.get(pipeType);
         float thickness = pipeType.getThickness();
+        ColourMultiplier multiplier = new ColourMultiplier(pipeColor);
+        PipeTextureInfo textureInfo = this.pipeTextures.get(pipeType);
+        IVertexOperation[] pipeConnectSide = ArrayUtils.addAll(pipeline, new IconTransformation(textureInfo.inTexture), multiplier);
+        IVertexOperation[] pipeSide = ArrayUtils.addAll(pipeline, new IconTransformation(textureInfo.sideTexture), multiplier);
 
-        /*
-        IVertexOperation[] basePipeline;
-        if (pos == null) {
-            basePipeline = pipeline;
-        } else {
-            basePipeline = ArrayUtils.addAll(
-                    pipeline,
-                    new Translation(pos),
-                    state.lightMatrix
-            );
-        }
-         */
-
-        IVertexOperation[] basePipeline;
-        if (pos == null) {
-            basePipeline = pipeline;
-        } else {
-            basePipeline = ArrayUtils.addAll(pipeline, new Translation(pos));
-        }
-
-        Map<EnumFacing, IVertexOperation[]> openPipelines = new EnumMap<>(EnumFacing.class);
-        Map<EnumFacing, IVertexOperation[]> sidePipelines = new EnumMap<>(EnumFacing.class);
-        for (EnumFacing facing : EnumFacing.VALUES) {
-            ColourMultiplier faceMultiplier = new ColourMultiplier(scaleColor(pipeColor, getFaceDiffuse(facing)));
-            openPipelines.put(facing, ArrayUtils.addAll(basePipeline, new IconTransformation(textureInfo.inTexture), faceMultiplier));
-            sidePipelines.put(facing, ArrayUtils.addAll(basePipeline, new IconTransformation(textureInfo.sideTexture), faceMultiplier));
-        }
-
-        IVertexOperation[] openPipeline = ArrayUtils.addAll(
-                basePipeline,
-                new IconTransformation(textureInfo.inTexture),
-                multiplier
-        );
-
-        IVertexOperation[] sidePipeline = ArrayUtils.addAll(
-                basePipeline,
-                new IconTransformation(textureInfo.sideTexture),
-                multiplier
-        );
-
-        int sidedConnMask = connectMask & 0b111111;
-        int endMask = (connectMask >> 6) & 0b111111;
-
-        Cuboid6 centerCuboid = BlockFluidPipe.getSideBox(null, thickness);
-
-        if (sidedConnMask == 0) {
-
-            for (EnumFacing face : EnumFacing.VALUES) {
-                renderFace(state, world, pos, sidePipeline, face, centerCuboid);
+        Cuboid6 cuboid6 = BlockFluidPipe.getSideBox(null, thickness);
+        if (connectMask == 0) {
+            for (EnumFacing renderedSide : EnumFacing.VALUES) {
+                renderPipeSide(state, pipeConnectSide, renderedSide, cuboid6);
             }
-
         } else {
-
-            for (EnumFacing face : EnumFacing.VALUES) {
-
-                if (!hasFlag(sidedConnMask, face)) {
-
-                    if (hasFlag(blockedMask, face)) {
-                        renderFace(state, world, pos, sidePipeline, face, centerCuboid);
-                        continue;
-                    }
-
-                    EnumFacing opposite = face.getOpposite();
-                    boolean oppositeConnected = hasFlag(sidedConnMask, opposite);
-                    boolean onlyOpposite = oppositeConnected && (sidedConnMask & ~(1 << opposite.getIndex())) == 0;
-
-                    if (onlyOpposite) {
-                        renderFace(state, world, pos, openPipeline, face, centerCuboid);
+            for (EnumFacing renderedSide : EnumFacing.VALUES) {
+                if ((connectMask & 1 << renderedSide.getIndex()) == 0) {
+                    int oppositeIndex = renderedSide.getOpposite().getIndex();
+                    if ((connectMask & 1 << oppositeIndex) > 0 && (connectMask & 63 & ~(1 << oppositeIndex)) == 0) {
+                        renderPipeSide(state, pipeConnectSide, renderedSide, cuboid6);
                     } else {
-                        renderFace(state, world, pos, sidePipeline, face, centerCuboid);
+                        renderPipeSide(state, pipeSide, renderedSide, cuboid6);
                     }
-
                 } else {
-
-                    Cuboid6 extCuboid = BlockFluidPipe.getSideBox(face, thickness);
-
-                    if (hasFlag(endMask, face)) {
-                        renderFace(state, world, pos, openPipeline, face, extCuboid);
-                    } else {
-                        renderFace(state, world, pos, sidePipeline, face, extCuboid);
-                    }
+                    renderPipeCube(connectMask, state, pipeSide, pipeConnectSide, renderedSide, thickness);
                 }
             }
         }
+    }
 
-        for (EnumFacing side : EnumFacing.VALUES) {
-
-            if (!hasFlag(sidedConnMask, side))
-                continue;
-
-            Cuboid6 extCuboid = BlockFluidPipe.getSideBox(side, thickness);
-
-            for (EnumFacing face : EnumFacing.VALUES) {
-
-                if (face.getAxis() == side.getAxis())
-                    continue;
-
-                renderFace(state, world, pos, sidePipeline, face, extCuboid);
+    private static void renderPipeCube(int connections, CCRenderState renderState, IVertexOperation[] pipeline, IVertexOperation[] pipeConnectSide, EnumFacing side, float thickness) {
+        Cuboid6 cuboid = BlockFluidPipe.getSideBox(side, thickness);
+        for (EnumFacing renderedSide : EnumFacing.VALUES) {
+            if (renderedSide.getAxis() != side.getAxis()) {
+                renderPipeSide(renderState, pipeline, renderedSide, cuboid);
             }
         }
-
-        return true;
-    }
-
-    protected static void renderFace(CCRenderState state, IBlockAccess world, BlockPos pos, IVertexOperation[] pipeline, EnumFacing side, Cuboid6 cuboid) {
-        if (world != null && pos != null) {
-            state.setBrightness(world, pos.offset(side));
+        if ((connections & (1 << (6 + side.getIndex()))) != 0) {
+            renderPipeSide(renderState, pipeConnectSide, side, cuboid);
+        } else {
+            renderPipeSide(renderState, pipeline, side, cuboid);
         }
-        BlockRenderer.BlockFace blockFace = blockFaces.get();
-        blockFace.loadCuboidFace(cuboid, side.getIndex());
-        state.setPipeline(blockFace, 0, blockFace.verts.length, pipeline);
-        state.render();
     }
 
-    private static boolean hasFlag(int mask, EnumFacing facing) {
-        return (mask & (1 << facing.getIndex())) != 0;
+    private static void renderPipeSide(CCRenderState renderState, IVertexOperation[] pipeline, EnumFacing side, Cuboid6 cuboid6) {
+        BlockFace blockFace = blockFaces.get();
+        blockFace.loadCuboidFace(cuboid6, side.getIndex());
+        renderState.setPipeline(blockFace, 0, blockFace.verts.length, pipeline);
+        renderState.render();
     }
 
     @Override
@@ -308,7 +234,7 @@ public class FluidPipeRenderer implements ICCBlockRenderer, IItemRenderer {
         renderState.bind(buffer);
         renderState.setPipeline(new Vector3(new Vec3d(pos)).translation(), new IconTransformation(sprite));
         BlockFluidPipe blockFluidPipe = (BlockFluidPipe) state.getBlock();
-        IPipeTile<FluidPipeType, FluidPipeProperties> tileEntityPipe = blockFluidPipe.getPipeTileEntity(world, pos);
+        IPipeTile<FluidPipeType, FluidPipeProperties> tileEntityPipe = blockFluidPipe.getPipeTileEntity(world, pos);;
         if (tileEntityPipe == null) {
             return;
         }
@@ -369,24 +295,5 @@ public class FluidPipeRenderer implements ICCBlockRenderer, IItemRenderer {
         int pipeColor = getPipeColor(material, tileEntity.getInsulationColor());
         TextureAtlasSprite atlasSprite = pipeTextures.get(fluidPipeType).sideTexture;
         return Pair.of(atlasSprite, pipeColor);
-    }
-
-
-    private static float getFaceDiffuse(EnumFacing facing) {
-        switch (facing) {
-            case DOWN: return DIFFUSE_DOWN;
-            case UP: return DIFFUSE_UP;
-            case NORTH:
-            case SOUTH: return DIFFUSE_NORTH_SOUTH;
-            default: return DIFFUSE_EAST_WEST;
-        }
-    }
-
-    private static int scaleColor(int argb, float scale) {
-        int a = (argb >>> 24) & 0xFF;
-        int r = Math.round(((argb >> 16) & 0xFF) * scale);
-        int g = Math.round(((argb >> 8) & 0xFF) * scale);
-        int b = Math.round((argb & 0xFF) * scale);
-        return (a << 24) | (r << 16) | (g << 8) | b;
     }
 }

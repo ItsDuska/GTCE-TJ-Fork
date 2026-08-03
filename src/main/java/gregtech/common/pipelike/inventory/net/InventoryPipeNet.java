@@ -28,15 +28,15 @@ public class InventoryPipeNet extends PipeNet<EmptyNodeData> implements ITickabl
     }
 
     @Override
-    protected void updateBlockedConnections(BlockPos nodePos, EnumFacing facing, boolean isBlocked) {
-        super.updateBlockedConnections(nodePos, facing, isBlocked);
-        getStorageNetwork().handleBlockedConnectionChange(nodePos, facing, isBlocked);
+    protected void updateConnectionEnabled(BlockPos nodePos, EnumFacing facing, boolean isEnabled) {
+        super.updateConnectionEnabled(nodePos, facing, isEnabled);
+        getStorageNetwork().handleBlockedConnectionChange(nodePos, facing, !isEnabled);
     }
 
     public void nodeNeighbourChanged(BlockPos nodePos) {
         if (containsNode(nodePos)) {
-            int blockedConnections = getNodeAt(nodePos).blockedConnections;
-            getStorageNetwork().checkForItemHandlers(nodePos, blockedConnections);
+            int enabledConnections = getNodeAt(nodePos).enabledConnections;
+            getStorageNetwork().checkForItemHandlers(nodePos, enabledConnections);
         }
     }
 

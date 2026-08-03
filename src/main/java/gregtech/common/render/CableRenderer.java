@@ -18,6 +18,7 @@ import codechicken.lib.vec.uv.IconTransformation;
 import gregtech.api.GTValues;
 import gregtech.api.cover.ICoverable;
 import gregtech.api.pipenet.tile.IPipeTile;
+import gregtech.api.render.Textures;
 import gregtech.api.unification.material.type.Material;
 import gregtech.api.util.GTLog;
 import gregtech.api.util.GTUtility;
@@ -113,7 +114,6 @@ public class CableRenderer implements ICCBlockRenderer, IItemRenderer {
         renderState.reset();
         renderState.bind(buffer);
         renderState.setBrightness(world, pos);
-        IVertexOperation[] pipeline = {new Translation(pos)};
 
         BlockCable blockCable = (BlockCable) state.getBlock();
         TileEntityCable tileEntityCable = (TileEntityCable) blockCable.getPipeTileEntity(world, pos);
@@ -125,16 +125,27 @@ public class CableRenderer implements ICCBlockRenderer, IItemRenderer {
         int extendedMask = tileEntityCable.getExtendedConnections();
 
 
-
         Insulation insulation = tileEntityCable.getPipeType();
         Material material = tileEntityCable.getPipeMaterial();
         if (insulation != null && material != null) {
             BlockRenderLayer renderLayer = MinecraftForgeClient.getRenderLayer();
             if (renderLayer == BlockRenderLayer.CUTOUT) {
+
+                boolean[] sideMask = new boolean[EnumFacing.VALUES.length];
+                for (EnumFacing side : EnumFacing.VALUES) {
+                    sideMask[side.getIndex()] = state.shouldSideBeRendered(world, pos, side);
+                }
+
+                Textures.RENDER_STATE.set(new CubeRendererState(renderLayer, sideMask, world));
+
+                renderState.lightMatrix.locate(world, pos);
+                IVertexOperation[] pipeline = new IVertexOperation[]{new Translation(pos), renderState.lightMatrix};
                 renderCableBlock(material, insulation, paintingColor, renderState, pipeline, connectedSidesMask,blockedSidesMask,extendedMask);
             }
             ICoverable coverable = tileEntityCable.getCoverableImplementation();
             coverable.renderCovers(renderState, new Matrix4().translate(pos.getX(), pos.getY(), pos.getZ()), renderLayer);
+
+            Textures.RENDER_STATE.remove();
         }
         return true;
     }

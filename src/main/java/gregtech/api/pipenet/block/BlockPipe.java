@@ -135,6 +135,11 @@ public abstract class BlockPipe<PipeType extends Enum<PipeType> & IPipeType<Node
             if ((activeMask & (1 << facing.getIndex())) != 0) {
                 pipeTile.setConnectionForced(facing, true);
                 pipeTile.setConnectionExtended(facing, false);
+
+                IPipeTile<PipeType, NodeDataType> neighborTile = getPipeTileEntity(worldIn, fromPos);
+                if (neighborTile != null && !neighborTile.isConnectionForced(facing.getOpposite())) {
+                    neighborTile.setConnectionForced(facing.getOpposite(), true);
+                }
             }
         }
     }
@@ -306,7 +311,10 @@ public abstract class BlockPipe<PipeType extends Enum<PipeType> & IPipeType<Node
                 return false;
             }
 
-            boolean hasRealConnection = (getActiveNodeConnections(selfTile.getPipeWorld(), selfTile.getPipePos(), selfTile) & (1 << side.getIndex())) != 0;
+            boolean hasNeighborTile = selfTile.getPipeWorld().getTileEntity(selfTile.getPipePos().offset(side)) != null;
+            boolean hasRealConnection = hasNeighborTile &&
+                    (getActiveNodeConnections(selfTile.getPipeWorld(), selfTile.getPipePos(), selfTile) & (1 << side.getIndex())) != 0;
+
 
             if (!player.world.isRemote) {
                 if (hasRealConnection) {
@@ -332,7 +340,7 @@ public abstract class BlockPipe<PipeType extends Enum<PipeType> & IPipeType<Node
             BlockPos selfPos = selfTile.getPipePos();
             BlockPos sidePos = sideTile.getPipePos();
 
-            boolean nowForced = !(selfTile.isConnectionForced(side) || sideTile.isConnectionForced(side.getOpposite()));
+            boolean nowForced = !(selfTile.isConnectionForced(side) && sideTile.isConnectionForced(side.getOpposite()));
 
             selfTile.setConnectionForced(side, nowForced);
             IPipeTile<PipeType, NodeDataType> freshSelf = getPipeTileEntity(world, selfPos);
@@ -368,24 +376,18 @@ public abstract class BlockPipe<PipeType extends Enum<PipeType> & IPipeType<Node
         int activeConnections = getActiveNodeConnections(world, pos, pipeTile);
         activeConnections &= ~pipeTile.getBlockedConnections();
         boolean isActiveNode = activeConnections > 0;
-        getWorldPipeNet(world).addNode(pos, createProperties(pipeTile), 0, pipeTile.getBlockedConnections(), getForcedConnectionsMask(pipeTile), isActiveNode);
-
-
-        if (isActiveNode != pipeTile.supportsTicking()) {
-            onActiveModeChange(world, pos, isActiveNode, true);
-        }
+        getWorldPipeNet(world).addNode(pos, createProperties(pipeTile), 0, getEnabledConnectionsMask(pipeTile), isActiveNode);
     }
 
-    public int getForcedConnectionsMask(IPipeTile<PipeType, NodeDataType> pipeTile) {
+    private int getEnabledConnectionsMask(IPipeTile<PipeType, NodeDataType> pipeTile) {
         int mask = 0;
         for (EnumFacing side : EnumFacing.VALUES) {
-            if (pipeTile.isConnectionForced(side)) {
+            if (pipeTile.isConnectionEnabled(side)) {
                 mask |= 1 << side.getIndex();
             }
         }
         return mask;
     }
-
 
     @Override
     public void onBlockClicked(World worldIn, BlockPos pos, EntityPlayer playerIn) {
@@ -483,22 +485,16 @@ public abstract class BlockPipe<PipeType extends Enum<PipeType> & IPipeType<Node
 
     protected final int isPipeAccessibleAtSideInternal(IPipeTile<PipeType, NodeDataType> selfTile, IPipeTile<PipeType, NodeDataType> tileEntityPipe, EnumFacing side) {
         if (tileEntityPipe == null) {
-            return 0; //not a cable pipe entity
+            return 0;
         }
-        if ((tileEntityPipe.getBlockedConnections() & 1 << side.getOpposite().getIndex()) > 0 ||
-            (selfTile.getBlockedConnections() & 1 << side.getIndex()) > 0) {
-            return 1; //connection is blocked on this facing
+        if (!canPipesConnect(selfTile, side, tileEntityPipe)) {
+            return 1;
         }
-
         int insulationColor = selfTile.getInsulationColor();
         if (insulationColor != IPipeTile.DEFAULT_INSULATION_COLOR &&
-            tileEntityPipe.getInsulationColor() != IPipeTile.DEFAULT_INSULATION_COLOR &&
-            insulationColor != tileEntityPipe.getInsulationColor()) {
-            return 1; //color doesn't match; unable to connect
-        }
-
-        if (!canPipesConnect(selfTile, side, tileEntityPipe)) {
-            return 1; //custom connection predicate didn't match
+                tileEntityPipe.getInsulationColor() != IPipeTile.DEFAULT_INSULATION_COLOR &&
+                insulationColor != tileEntityPipe.getInsulationColor()) {
+            return 1;
         }
         PipeType otherPipeType = tileEntityPipe.getPipeType();
         PipeType myPipeType = selfTile.getPipeType();
@@ -509,8 +505,9 @@ public abstract class BlockPipe<PipeType extends Enum<PipeType> & IPipeType<Node
     }
 
     protected boolean canPipesConnect(IPipeTile<PipeType, NodeDataType> selfTile, EnumFacing side, IPipeTile<PipeType, NodeDataType> sideTile) {
-        return selfTile.isConnectionForced(side) || sideTile.isConnectionForced(side.getOpposite());
+        return selfTile.isConnectionEnabled(side) && sideTile.isConnectionEnabled(side.getOpposite());
     }
+
 
     /**
      * Returns bit mask of actual cable connections, including cable-cable and cable-receiver
@@ -532,7 +529,9 @@ public abstract class BlockPipe<PipeType extends Enum<PipeType> & IPipeType<Node
                 if (cableState >= 3) {
                     connectedSidesMask |= 1 << (6 + side.getIndex());
                 }
-            } else if ((selfTile.isConnectionForced(side) && (activeNodeConnections & 1 << side.getIndex()) > 0)) {
+            } else if (selfTile.isConnectionForced(side) &&
+                    selfTile.getPipeWorld().getTileEntity(selfTile.getPipePos().offset(side)) != null &&
+                    (activeNodeConnections & 1 << side.getIndex()) > 0) {
                 connectedSidesMask |= 1 << side.getIndex();
                 connectedSidesMask |= 1 << (6 + side.getIndex());
             } else if (selfTile.isConnectionExtended(side)) {
@@ -615,6 +614,16 @@ public abstract class BlockPipe<PipeType extends Enum<PipeType> & IPipeType<Node
     }
 
     public static class GridInteractionData {
+    }
+
+    /**
+     * @return the pipe cuboid for that side but with a offset one the facing with the cover to prevent z fighting.
+     */
+    public static Cuboid6 getCoverSideBox(EnumFacing side, float thickness) {
+        Cuboid6 cuboid = getSideBox(side, thickness);
+        if (side != null)
+            cuboid.setSide(side, side.getAxisDirection() == EnumFacing.AxisDirection.NEGATIVE ? 0.001 : 0.999);
+        return cuboid;
     }
 
     public static Cuboid6 getSideBox(EnumFacing side, float thickness) {

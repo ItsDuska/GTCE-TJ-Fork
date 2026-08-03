@@ -49,7 +49,7 @@ public class CableEnergyContainer implements IEnergyContainer {
                 continue;
             }
 
-            amperesUsed += dispatchEnergyToNode(destinationPos, destinationNode.blockedConnections, destinationNode.forcedConnections, voltage - routePath.totalLoss, amperage - amperesUsed);
+            amperesUsed += dispatchEnergyToNode(destinationPos, destinationNode.enabledConnections,  voltage - routePath.totalLoss, amperage - amperesUsed);
 
             if (voltage > routePath.minVoltage || amperesUsed > routePath.maxAmperage) {
                 burnAllPaths(paths, voltage, amperage, amperesUsed);
@@ -71,12 +71,12 @@ public class CableEnergyContainer implements IEnergyContainer {
         }
     }
 
-    private long dispatchEnergyToNode(BlockPos nodePos, int nodeBlockedConnections, int nodeForcedConnections, long voltage, long amperage) {
+    private long dispatchEnergyToNode(BlockPos nodePos, int nodeEnabledConnections,  long voltage, long amperage) {
         long amperesUsed = 0L;
         World world = tileEntityCable.getPipeWorld();
         PooledMutableBlockPos blockPos = PooledMutableBlockPos.retain();
         for (EnumFacing facing : EnumFacing.VALUES) {
-            if ((nodeBlockedConnections & 1 << facing.getIndex()) > 0) {
+            if ((nodeEnabledConnections & 1 << facing.getIndex()) == 0) {
                 continue;
             }
             blockPos.setPos(nodePos).move(facing);
@@ -87,9 +87,7 @@ public class CableEnergyContainer implements IEnergyContainer {
             if (tileEntity == null || tileEntityCable.getPipeBlock().getPipeTileEntity(tileEntity) != null) {
                 continue;
             }
-            if ((nodeForcedConnections & 1 << facing.getIndex()) == 0) {
-                continue;
-            }
+
             IEnergyContainer energyContainer = tileEntity.getCapability(GregtechCapabilities.CAPABILITY_ENERGY_CONTAINER, facing.getOpposite());
             if (energyContainer == null) continue;
             amperesUsed += energyContainer.acceptEnergyFromNetwork(facing.getOpposite(), voltage, amperage - amperesUsed);

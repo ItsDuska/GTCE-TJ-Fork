@@ -129,11 +129,6 @@ public abstract class TileEntityPipeBase<PipeType extends Enum<PipeType> & IPipe
     }
 
     @Override
-    public int getForcedConnections() {
-        return forcedConnections;
-    }
-
-    @Override
     public TIntIntMap getBlockedConnectionsMap() {
         return new TIntIntHashMap(blockedConnectionsMap);
     }
@@ -158,7 +153,11 @@ public abstract class TileEntityPipeBase<PipeType extends Enum<PipeType> & IPipe
     @Override
     public boolean isConnectionBlocked(AttachmentType type, EnumFacing side) {
         int blockedConnections = blockedConnectionsMap.get(type.ordinal());
-        return (blockedConnections & 1 << side.getIndex()) > 0;
+        return isFaceBlocked(blockedConnections, side);
+    }
+
+    public static boolean isFaceBlocked( int blockedConnections, EnumFacing side) {
+        return (blockedConnections & (1 << side.getIndex())) > 0;
     }
 
     @Override
@@ -168,7 +167,7 @@ public abstract class TileEntityPipeBase<PipeType extends Enum<PipeType> & IPipe
         recomputeBlockedConnections();
         if (!getWorld().isRemote) {
             if (!detachedConversionMode) {
-                updateSideBlockedConnection(side);
+                updateSideConnection(side);
             }
             writeCustomData(-2, buffer -> buffer.writeVarInt(this.blockedConnections));
             markDirty();
@@ -183,7 +182,7 @@ public abstract class TileEntityPipeBase<PipeType extends Enum<PipeType> & IPipe
         this.blockedConnections = resultBlockedConnections;
     }
 
-    private void updateSideBlockedConnection(EnumFacing side) {
+    private void updateSideConnection(EnumFacing side) {
         if (detachedConversionMode) {
             return;
         }
@@ -194,7 +193,11 @@ public abstract class TileEntityPipeBase<PipeType extends Enum<PipeType> & IPipe
         for(int blockedConnections : blockedConnectionsMap.values()) {
             isSideBlocked |= (blockedConnections & sideIndex) > 0;
         }
-        worldPipeNet.updateBlockedConnections(getPos(), side, isSideBlocked);
+
+        if (detachedConversionMode) {
+            return;
+        }
+        getPipeBlock().getWorldPipeNet(getWorld()).updateConnectionEnabled(getPos(), side, isConnectionEnabled(side));
 
     }
 
@@ -241,9 +244,7 @@ public abstract class TileEntityPipeBase<PipeType extends Enum<PipeType> & IPipe
             return defaultValue;
         }
         if(coverBehavior == null && facing != null) {
-            boolean isBlocked = (getBlockedConnections() & 1 << facing.getIndex()) > 0;
-            boolean isForced = isConnectionForced(facing);
-            return (isBlocked || !isForced) ? null : defaultValue;
+          return isConnectionEnabled(facing) ? defaultValue : null;
         }
         if (coverBehavior != null) {
             return coverBehavior.getCapability(capability, defaultValue);
@@ -395,28 +396,29 @@ public abstract class TileEntityPipeBase<PipeType extends Enum<PipeType> & IPipe
         return oldState.getBlock() != newSate.getBlock();
     }
 
+
     @Override
     public boolean isConnectionForced(EnumFacing side) {
-        return (forcedConnections & (1 << side.getIndex())) > 0;
+        return isConnected(forcedConnections, side);
     }
+
+    public static boolean isConnected(int connections, EnumFacing side) {
+        return (connections & 1 << side.getIndex()) > 0;
+    }
+
 
     @Override
     public void setConnectionForced(EnumFacing side, boolean forced) {
         if (forced) forcedConnections |= 1 << side.getIndex();
         else forcedConnections &= ~(1 << side.getIndex());
-
         if (getWorld().isRemote) {
             return;
         }
-
         writeCustomData(-6, buffer -> buffer.writeVarInt(forcedConnections));
         markDirty();
         notifyBlockUpdate();
         scheduleChunkForRenderUpdate();
-
-        if (!detachedConversionMode) {
-            getPipeBlock().getWorldPipeNet(getWorld()).updateForcedConnections(getPos(), side, forced);
-        }
+        updateSideConnection(side);
     }
 
     public boolean isConnectionExtended(EnumFacing side) {
@@ -435,5 +437,21 @@ public abstract class TileEntityPipeBase<PipeType extends Enum<PipeType> & IPipe
 
     public int getExtendedConnections() {
         return extendedConnections;
+    }
+
+
+    public boolean isConnectionEnabled(EnumFacing side) {
+        return isConnectionForced(side) && !isConnectionBlockedAnywhere(side);
+    }
+
+
+
+    private boolean isConnectionBlockedAnywhere(EnumFacing side) {
+        boolean isBlocked = false;
+        int sideIndex = 1 << side.getIndex();
+        for (int blocked : blockedConnectionsMap.values()) {
+            isBlocked |= (blocked & sideIndex) > 0;
+        }
+        return isBlocked;
     }
 }
