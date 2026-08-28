@@ -1,0 +1,14 @@
+{
+  "package": "gregtech.mixins",
+  "refmap": "mixins.gregtech.refmap.json",
+  "target": "@env(DEFAULT)",
+  "required": false,
+  "minVersion": "0.8",
+  "compatibilityLevel": "JAVA_8",
+  "mixins": [],
+  "client": [
+    "MixinTileEntityRenderer",
+    "MixinRenderChunkMixin"
+  ],
+  "server": []
+}

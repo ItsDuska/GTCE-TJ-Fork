@@ -12,6 +12,7 @@ import gregtech.api.multiblock.BlockWorldState;
 import gregtech.api.multiblock.IPatternCenterPredicate;
 import gregtech.api.multiblock.PatternMatchContext;
 import gregtech.api.render.ICubeRenderer;
+import gregtech.api.render.MetaTileEntityRenderer;
 import gregtech.api.render.OrientedOverlayRenderer;
 import gregtech.api.render.Textures;
 import gregtech.api.util.GTUtility;
@@ -165,7 +166,7 @@ public abstract class MultiblockControllerBase extends MetaTileEntity {
 
     @Override
     public void renderMetaTileEntity(CCRenderState renderState, Matrix4 translation, IVertexOperation[] pipeline) {
-        getBaseTexture(null).render(renderState, translation, ArrayUtils.add(pipeline, new ColourMultiplier(GTUtility.convertRGBtoOpaqueRGBA_CL(getPaintingColorForRendering()))));
+        getBaseTexture(null).render(renderState, translation, ArrayUtils.add(pipeline,  MetaTileEntityRenderer.getColourMultiplier(GTUtility.convertRGBtoOpaqueRGBA_CL(getPaintingColor()))));
     }
 
     @Override
