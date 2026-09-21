@@ -102,7 +102,7 @@ public class CableRenderer implements ICCBlockRenderer, IItemRenderer {
         if (insulation != null && material != null) {
             renderCableBlock(material, insulation, IPipeTile.DEFAULT_INSULATION_COLOR, renderState, new IVertexOperation[0],
                 1 << EnumFacing.SOUTH.getIndex() | 1 << EnumFacing.NORTH.getIndex() |
-                    1 << (6 + EnumFacing.SOUTH.getIndex()) | 1 << (6 + EnumFacing.NORTH.getIndex()), 0,0);
+                    1 << (6 + EnumFacing.SOUTH.getIndex()) | 1 << (6 + EnumFacing.NORTH.getIndex()),0);
         }
         renderState.draw();
         GlStateManager.disableBlend();
@@ -122,7 +122,6 @@ public class CableRenderer implements ICCBlockRenderer, IItemRenderer {
         int connectedSidesMask = blockCable.getActualConnections(tileEntityCable, world);
 
         int blockedSidesMask = tileEntityCable.getBlockedConnections();
-        int extendedMask = tileEntityCable.getExtendedConnections();
 
 
         Insulation insulation = tileEntityCable.getPipeType();
@@ -140,7 +139,7 @@ public class CableRenderer implements ICCBlockRenderer, IItemRenderer {
 
                 renderState.lightMatrix.locate(world, pos);
                 IVertexOperation[] pipeline = new IVertexOperation[]{new Translation(pos), renderState.lightMatrix};
-                renderCableBlock(material, insulation, paintingColor, renderState, pipeline, connectedSidesMask,blockedSidesMask,extendedMask);
+                renderCableBlock(material, insulation, paintingColor, renderState, pipeline, connectedSidesMask,blockedSidesMask);
             }
             ICoverable coverable = tileEntityCable.getCoverableImplementation();
             coverable.renderCovers(renderState, new Matrix4().translate(pos.getX(), pos.getY(), pos.getZ()), renderLayer);
@@ -150,7 +149,8 @@ public class CableRenderer implements ICCBlockRenderer, IItemRenderer {
         return true;
     }
 
-    public void renderCableBlock(Material material, Insulation insulation1, int insulationColor1, CCRenderState state, IVertexOperation[] pipeline, int connectMask, int blockedSidesMask,int extendedMask) {
+
+    public void renderCableBlock(Material material, Insulation insulation1, int insulationColor1, CCRenderState state, IVertexOperation[] pipeline, int connectMask, int blockedSidesMask) {
         int wireColor = GTUtility.convertRGBtoOpaqueRGBA_CL(material.materialRGB);
         float thickness = insulation1.thickness;
 
@@ -160,8 +160,9 @@ public class CableRenderer implements ICCBlockRenderer, IItemRenderer {
 
         if (insulation1.insulationLevel != -1) {
             int insulationColor = GTUtility.convertRGBtoOpaqueRGBA_CL(insulationColor1);
-            ColourMultiplier multiplier = new ColourMultiplier(insulationColor);
-            insulation = ArrayUtils.addAll(pipeline, new IconTransformation(insulationTextures[5]), multiplier);
+            ColourMultiplier multiplier = new ColourMultiplier(GTUtility.convertRGBtoOpaqueRGBA_CL(insulationColor));
+
+            insulation = ArrayUtils.addAll(pipeline, new IconTransformation(insulationTextures[5]));
             overlays = ArrayUtils.addAll(pipeline, new IconTransformation(insulationTextures[insulation1.insulationLevel]), multiplier);
         }
 
@@ -230,11 +231,15 @@ public class CableRenderer implements ICCBlockRenderer, IItemRenderer {
             }
         }
     }
+    //
 
     private static void renderCableSide(CCRenderState renderState, IVertexOperation[] pipeline, EnumFacing side, Cuboid6 cuboid6) {
         BlockFace blockFace = blockFaces.get();
         blockFace.loadCuboidFace(cuboid6, side.getIndex());
+
         renderState.setPipeline(blockFace, 0, blockFace.verts.length, pipeline);
+
+
         renderState.render();
     }
 
@@ -317,5 +322,12 @@ public class CableRenderer implements ICCBlockRenderer, IItemRenderer {
             particleColor = tileEntity.getInsulationColor();
         }
         return Pair.of(atlasSprite, particleColor);
+    }
+
+
+    private int getCableColor(Material material, int insulationColor) {
+        if (insulationColor == IPipeTile.DEFAULT_INSULATION_COLOR) {
+            return material.materialRGB;
+        } else return insulationColor;
     }
 }

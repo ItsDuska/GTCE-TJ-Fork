@@ -42,7 +42,7 @@ public abstract class WorldPipeNet<NodeDataType, T extends PipeNet<NodeDataType>
         T existingNet = getNetFromPos(nodePos);
         if (existingNet != null) {
             Node<NodeDataType> existing = existingNet.getNodeAt(nodePos);
-            existing.enabledConnections = enabledConnections;
+            existing.blockedConnections = enabledConnections;
             existing.mark = mark;
             existing.isActive = isActive;
             return;
@@ -78,7 +78,11 @@ public abstract class WorldPipeNet<NodeDataType, T extends PipeNet<NodeDataType>
 
     protected void removePipeNetFromChunk(ChunkPos chunkPos, T pipeNet) {
         List<T> list = this.pipeNetsByChunk.get(chunkPos);
-        if (list != null) list.remove(pipeNet);
+        if (list == null) {
+           return;
+        }
+
+        list.remove(pipeNet);
         if (list.isEmpty()) this.pipeNetsByChunk.remove(chunkPos);
     }
 
@@ -89,10 +93,10 @@ public abstract class WorldPipeNet<NodeDataType, T extends PipeNet<NodeDataType>
         }
     }
 
-    public void updateConnectionEnabled(BlockPos nodePos, EnumFacing side, boolean isEnabled) {
+    public void updateBlockedConnections(BlockPos nodePos, EnumFacing side, boolean isBlocked) {
         T pipeNet = getNetFromPos(nodePos);
         if (pipeNet != null) {
-            pipeNet.updateConnectionEnabled(nodePos, side, isEnabled);
+            pipeNet.updateBlockedConnections(nodePos, side, isBlocked);
         }
     }
 

@@ -1,5 +1,6 @@
 package gregtech.api.pipenet.block;
 
+import gregtech.api.pipenet.tile.AttachmentType;
 import gregtech.api.pipenet.tile.IPipeTile;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.entity.player.EntityPlayer;
@@ -30,18 +31,27 @@ public class ItemBlockPipe<PipeType extends Enum<PipeType> & IPipeType<NodeDataT
                                 float hitX, float hitY, float hitZ, IBlockState newState) {
         boolean placed = super.placeBlockAt(stack, player, world, pos, side, hitX, hitY, hitZ, newState);
         if (placed && !world.isRemote) {
-            BlockPos clickedPos = pos.offset(side.getOpposite());
             IPipeTile<PipeType, NodeDataType> placedPipe = blockPipe.getPipeTileEntity(world, pos);
             if (placedPipe != null) {
+                EnumFacing towardClicked = side.getOpposite();
+                BlockPos clickedPos = pos.offset(towardClicked);
                 IPipeTile<PipeType, NodeDataType> clickedPipe = blockPipe.getPipeTileEntity(world, clickedPos);
+
+                boolean connect = false;
                 if (clickedPipe != null) {
-                    placedPipe.setConnectionForced(side.getOpposite(), true);
-                    clickedPipe.setConnectionForced(side, true);
+                    connect = true;
                 } else if (world.getTileEntity(clickedPos) != null) {
                     int activeMask = blockPipe.getActiveNodeConnections(world, pos, placedPipe);
-                    if ((activeMask & (1 << side.getOpposite().getIndex())) != 0) {
-                        placedPipe.setConnectionForced(side.getOpposite(), true);
-                    }
+                    connect = (activeMask & (1 << towardClicked.getIndex())) != 0;
+                }
+
+                // opt-in: start with every side blocked, open only the one we were placed against
+                for (EnumFacing face : EnumFacing.VALUES) {
+                    boolean open = connect && face == towardClicked;
+                    placedPipe.setConnectionBlocked(AttachmentType.PIPE, face, !open);
+                }
+                if (clickedPipe != null) {
+                    clickedPipe.setConnectionBlocked(AttachmentType.PIPE, side, false);
                 }
             }
         }

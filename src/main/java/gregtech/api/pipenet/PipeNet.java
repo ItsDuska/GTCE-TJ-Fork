@@ -107,23 +107,27 @@ public abstract class PipeNet<NodeDataType> implements INBTSerializable<NBTTagCo
         }
     }
 
-    protected void updateConnectionEnabled(BlockPos nodePos, EnumFacing facing, boolean isEnabled) {
+    protected void updateBlockedConnections(BlockPos nodePos, EnumFacing facing, boolean isBlocked) {
         if (!containsNode(nodePos)) {
             return;
         }
         Node<NodeDataType> selfNode = getNodeAt(nodePos);
-        boolean wasEnabled = (selfNode.enabledConnections & 1 << facing.getIndex()) > 0;
-        if (wasEnabled == isEnabled) {
+        boolean wasBlocked = (selfNode.blockedConnections & 1 << facing.getIndex()) > 0;
+        if (wasBlocked == isBlocked) {
             return;
         }
-        setEnabled(selfNode, facing, isEnabled);
+        setBlocked(selfNode, facing, isBlocked);
+        onConnectionsUpdate();
+        worldData.markDirty();
+
         BlockPos offsetPos = nodePos.offset(facing);
         PipeNet<NodeDataType> pipeNetAtOffset = worldData.getNetFromPos(offsetPos);
         if (pipeNetAtOffset == null) {
             return;
         }
+
         if (pipeNetAtOffset == this) {
-            if (!isEnabled) {
+            if (isBlocked) {
                 HashMap<BlockPos, Node<NodeDataType>> thisNet = findAllConnectedBlocks(nodePos);
                 if (!getAllNodes().equals(thisNet)) {
                     PipeNet<NodeDataType> newPipeNet = worldData.createNetInstance();
@@ -132,22 +136,20 @@ public abstract class PipeNet<NodeDataType> implements INBTSerializable<NBTTagCo
                     worldData.addPipeNet(newPipeNet);
                 }
             }
-        } else if (isEnabled) {
+        } else if (!isBlocked) {
             Node<NodeDataType> neighbourNode = pipeNetAtOffset.getNodeAt(offsetPos);
             if (canNodesConnect(selfNode, facing, neighbourNode, pipeNetAtOffset) &&
                     pipeNetAtOffset.canNodesConnect(neighbourNode, facing.getOpposite(), selfNode, this)) {
                 uniteNetworks(pipeNetAtOffset);
             }
         }
-        onConnectionsUpdate();
-        worldData.markDirty();
     }
 
-    private void setEnabled(Node<NodeDataType> node, EnumFacing facing, boolean isEnabled) {
-        if (isEnabled) {
-            node.enabledConnections |= 1 << facing.getIndex();
+    private void setBlocked(Node<NodeDataType> node, EnumFacing facing, boolean isBlocked) {
+        if (isBlocked) {
+            node.blockedConnections |= 1 << facing.getIndex();
         } else {
-            node.enabledConnections &= ~(1 << facing.getIndex());
+            node.blockedConnections &= ~(1 << facing.getIndex());
         }
     }
 
@@ -200,14 +202,6 @@ public abstract class PipeNet<NodeDataType> implements INBTSerializable<NBTTagCo
         }
         onConnectionsUpdate();
         worldData.markDirty();
-    }
-
-    private void setBlocked(Node<NodeDataType> selfNode, EnumFacing facing, boolean isBlocked) {
-        if (isBlocked) {
-            selfNode.enabledConnections |= 1 << facing.getIndex();
-        } else {
-            selfNode.enabledConnections &= ~(1 << facing.getIndex());
-        }
     }
 
     public boolean markNodeAsActive(BlockPos nodePos, boolean isActive) {
@@ -412,8 +406,8 @@ public abstract class PipeNet<NodeDataType> implements INBTSerializable<NBTTagCo
             if (node.mark != Node.DEFAULT_MARK) {
                 nodeTag.setInteger("mark", node.mark);
             }
-            if (node.enabledConnections > 0) {
-                nodeTag.setInteger("blocked", node.enabledConnections);
+            if (node.blockedConnections > 0) {
+                nodeTag.setInteger("blocked", node.blockedConnections);
             }
 
 
@@ -437,8 +431,8 @@ public abstract class PipeNet<NodeDataType> implements INBTSerializable<NBTTagCo
     }
 
     private boolean areNodesConnected(Node<NodeDataType> first, EnumFacing firstFacing, Node<NodeDataType> second) {
-        return (first.enabledConnections & 1 << firstFacing.getIndex()) != 0 &&
-                (second.enabledConnections & 1 << firstFacing.getOpposite().getIndex()) != 0;
+        return (first.blockedConnections & 1 << firstFacing.getIndex()) == 0 &&
+                (second.blockedConnections & 1 << firstFacing.getOpposite().getIndex()) == 0;
     }
 
 

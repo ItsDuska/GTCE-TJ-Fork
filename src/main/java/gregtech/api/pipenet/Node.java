@@ -14,7 +14,7 @@ public final class Node<NodeDataType> {
      * Node will not connect in blocked direction in any case,
      * even if neighbour node mark matches
      */
-    public int enabledConnections;
+    public int blockedConnections;
     /**
      * Specifies mark of this node
      * Nodes can connect only if their marks are equal, or if
@@ -24,9 +24,9 @@ public final class Node<NodeDataType> {
     public int mark;
     public boolean isActive;
 
-    public Node(NodeDataType data, int enabledConnections, int mark, boolean isActive) {
+    public Node(NodeDataType data, int blockedConnections, int mark, boolean isActive) {
         this.data = data;
-        this.enabledConnections = enabledConnections;
+        this.blockedConnections = blockedConnections;
         this.mark = mark;
         this.isActive = isActive;
     }
