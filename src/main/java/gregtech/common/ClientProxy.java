@@ -22,6 +22,7 @@ import gregtech.common.render.CableRenderer;
 import gregtech.common.render.FluidPipeRenderer;
 import gregtech.common.render.StoneRenderer;
 import gregtech.common.sound.GTSoundSystem;
+import groovyjarjarantlr4.v4.runtime.misc.NotNull;
 import net.minecraft.block.BlockColored;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.Minecraft;
@@ -29,6 +30,7 @@ import net.minecraft.client.entity.AbstractClientPlayer;
 import net.minecraft.client.network.NetworkPlayerInfo;
 import net.minecraft.client.renderer.color.IBlockColor;
 import net.minecraft.client.renderer.color.IItemColor;
+import net.minecraft.client.renderer.texture.TextureMap;
 import net.minecraft.init.Items;
 import net.minecraft.client.resources.I18n;
 import net.minecraft.entity.player.EntityPlayer;
@@ -43,6 +45,7 @@ import net.minecraft.world.IBlockAccess;
 import net.minecraft.world.biome.BiomeColorHelper;
 import net.minecraftforge.client.event.ModelRegistryEvent;
 import net.minecraftforge.client.event.RenderPlayerEvent;
+import net.minecraftforge.client.event.TextureStitchEvent;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.common.util.Constants;
 import net.minecraftforge.event.entity.player.ItemTooltipEvent;
@@ -116,8 +119,9 @@ public class ClientProxy extends CommonProxy {
         super.onPreLoad();
         GTSoundSystem.getInstance().init();
         MetaTileEntityRenderer.preInit();
-        CableRenderer.preInit();
-        FluidPipeRenderer.preInit();
+        //CableRenderer.preInit();
+        CableRenderer.INSTANCE.preInit();
+        FluidPipeRenderer.INSTANCE.preInit();
         StoneRenderer.preInit();
         MetaEntities.initRenderers();
         TextureUtils.addIconRegister(MetaFluids::registerSprites);
@@ -149,6 +153,14 @@ public class ClientProxy extends CommonProxy {
         MetaBlocks.registerStateMappers();
         MetaBlocks.registerItemModels();
         MetaItems.registerModels();
+    }
+
+
+    @SubscribeEvent
+    public static void textureStitchPre(@NotNull TextureStitchEvent.Pre event) {
+        TextureMap map = event.getMap();
+        CableRenderer.INSTANCE.registerIcon(map);
+        FluidPipeRenderer.INSTANCE.registerIcon(map);
     }
 
     @SubscribeEvent

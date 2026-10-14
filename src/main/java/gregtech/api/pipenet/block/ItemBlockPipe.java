@@ -2,6 +2,7 @@ package gregtech.api.pipenet.block;
 
 import gregtech.api.pipenet.tile.AttachmentType;
 import gregtech.api.pipenet.tile.IPipeTile;
+import gregtech.api.pipenet.tile.TileEntityPipeBase;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemBlock;
@@ -34,24 +35,12 @@ public class ItemBlockPipe<PipeType extends Enum<PipeType> & IPipeType<NodeDataT
             IPipeTile<PipeType, NodeDataType> placedPipe = blockPipe.getPipeTileEntity(world, pos);
             if (placedPipe != null) {
                 EnumFacing towardClicked = side.getOpposite();
-                BlockPos clickedPos = pos.offset(towardClicked);
-                IPipeTile<PipeType, NodeDataType> clickedPipe = blockPipe.getPipeTileEntity(world, clickedPos);
-
-                boolean connect = false;
-                if (clickedPipe != null) {
-                    connect = true;
-                } else if (world.getTileEntity(clickedPos) != null) {
-                    int activeMask = blockPipe.getActiveNodeConnections(world, pos, placedPipe);
-                    connect = (activeMask & (1 << towardClicked.getIndex())) != 0;
+                if (blockPipe.canAutoConnect(placedPipe, towardClicked)) {
+                    placedPipe.setConnection(towardClicked, true, false);
                 }
 
-                // opt-in: start with every side blocked, open only the one we were placed against
-                for (EnumFacing face : EnumFacing.VALUES) {
-                    boolean open = connect && face == towardClicked;
-                    placedPipe.setConnectionBlocked(AttachmentType.PIPE, face, !open);
-                }
-                if (clickedPipe != null) {
-                    clickedPipe.setConnectionBlocked(AttachmentType.PIPE, side, false);
+                if (placedPipe instanceof TileEntityPipeBase<?,?> base) {
+                    base.markConnectionInitialised();
                 }
             }
         }

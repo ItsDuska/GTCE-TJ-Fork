@@ -6,6 +6,7 @@ import gregtech.api.pipenet.block.material.BlockMaterialPipe;
 import gregtech.api.pipenet.tile.IPipeTile;
 import gregtech.api.pipenet.tile.TileEntityPipeBase;
 import gregtech.api.unification.material.type.Material;
+import gregtech.api.util.GTFluidUtils;
 import gregtech.common.pipelike.fluidpipe.net.FluidPipeNet;
 import gregtech.common.pipelike.fluidpipe.net.WorldFluidPipeNet;
 import gregtech.common.pipelike.fluidpipe.tile.FluidPipeFluidHandler;
@@ -26,6 +27,7 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.IBlockAccess;
 import net.minecraft.world.World;
 import net.minecraftforge.fluids.FluidStack;
+import net.minecraftforge.fluids.FluidTank;
 import net.minecraftforge.fluids.capability.CapabilityFluidHandler;
 import net.minecraftforge.fluids.capability.IFluidHandler;
 import net.minecraftforge.fml.relauncher.Side;
@@ -87,7 +89,7 @@ public class BlockFluidPipe extends BlockMaterialPipe<FluidPipeType, FluidPipePr
 
 
     @Override
-    protected int getActiveVisualConnections(IPipeTile<FluidPipeType, FluidPipeProperties> selfTile) {
+    public int getActiveVisualConnections(IPipeTile<FluidPipeType, FluidPipeProperties> selfTile) {
         int activeNodeConnections = 0;
         for (EnumFacing side : EnumFacing.VALUES) {
             BlockPos offsetPos = selfTile.getPipePos().offset(side);
@@ -109,7 +111,10 @@ public class BlockFluidPipe extends BlockMaterialPipe<FluidPipeType, FluidPipePr
         for (EnumFacing side : EnumFacing.VALUES) {
             BlockPos offsetPos = selfTileEntity.getPipePos().offset(side);
             TileEntity tileEntity = selfTileEntity.getPipeWorld().getTileEntity(offsetPos);
-            if (tileEntity == null || getPipeTileEntity(tileEntity) != null) continue;
+            if (tileEntity == null) {
+                continue;
+            }
+            if (getPipeTileEntity(tileEntity) != null && !isDifferentPipeNet(selfTileEntity, tileEntity)) continue;
             EnumFacing opposite = side.getOpposite();
             IFluidHandler sourceHandler = getRawFluidHandler(selfTileEntity, side);
             IFluidHandler receivedHandler = tileEntity.getCapability(CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY, opposite);
@@ -140,6 +145,39 @@ public class BlockFluidPipe extends BlockMaterialPipe<FluidPipeType, FluidPipePr
             return sourceThickness > destThickness;
         }
         return true;
+    }
+
+
+    public boolean isDifferentPipeNet(IPipeTile<FluidPipeType, FluidPipeProperties> self, TileEntity other) {
+        IPipeTile<FluidPipeType, FluidPipeProperties> otherPipe = getPipeTileEntity(other);
+        return otherPipe != null && !otherPipe.getNodeData().equals(self.getNodeData());
+    }
+    // how much fluid to move from pipe net a to b.
+    public int getAmountToMove(IPipeTile<FluidPipeType, FluidPipeProperties> self, TileEntity other) {
+        IPipeTile<FluidPipeType, FluidPipeProperties> otherPipe = getPipeTileEntity(other);
+        if (otherPipe == null) {
+            return 0;
+        }
+
+        WorldFluidPipeNet worldFluidPipeNet = getWorldPipeNet(self.getPipeWorld());
+
+        FluidPipeNet from = worldFluidPipeNet.getNetFromPos(self.getPipePos());
+        FluidPipeNet to = worldFluidPipeNet.getNetFromPos(otherPipe.getPipePos());
+
+        if (from == null || to == null || from == to) {
+            return 0;
+        }
+
+        FluidTank fromTank = from.getFluidNetTank();
+        FluidTank toTank = to.getFluidNetTank();
+        long fromCap = fromTank.getCapacity();
+        long toCap = toTank.getCapacity();
+        if (fromCap <= 0 || toCap <= 0) {
+            return 0;
+        }
+
+        long diff = (long) fromTank.getFluidAmount() * toCap - (long) toTank.getFluidAmount() * fromCap;
+        return (int) Math.max(0, diff / (fromCap + toCap));
     }
 
     @Override
@@ -189,7 +227,7 @@ public class BlockFluidPipe extends BlockMaterialPipe<FluidPipeType, FluidPipePr
     @Override
     @SideOnly(Side.CLIENT)
     public EnumBlockRenderType getRenderType(IBlockState state) {
-        return FluidPipeRenderer.BLOCK_RENDER_TYPE;
+        return FluidPipeRenderer.INSTANCE.getBlockRenderType();
     }
 
     @Override

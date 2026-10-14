@@ -28,6 +28,7 @@ import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.EnumHand;
 import net.minecraft.util.ResourceLocation;
+import net.minecraft.world.World;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
 import org.apache.commons.lang3.ArrayUtils;
@@ -55,7 +56,6 @@ public abstract class MultiblockControllerBase extends MetaTileEntity {
     protected void reinitializeStructurePattern() {
         this.structurePattern = createStructurePattern();
     }
-
 
     @Override
     public void update() {

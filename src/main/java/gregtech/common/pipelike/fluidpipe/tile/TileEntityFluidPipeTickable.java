@@ -64,14 +64,27 @@ public class TileEntityFluidPipeTickable extends TileEntityFluidPipe implements 
                 continue; // do not allow pipes to load chunks
             }
             TileEntity tileEntity = pipeTile.getPipeWorld().getTileEntity(blockPos);
-            if (tileEntity == null || blockFluidPipe.getPipeTileEntity(tileEntity) != null) {
-                continue; // do not emit into multiparts or other fluid pipes — same-net segments already share the tank
+            if (tileEntity == null) {
+                continue;
+            }
+            boolean otherIsPipe = blockFluidPipe.getPipeTileEntity(tileEntity) != null;
+            if (otherIsPipe && !blockFluidPipe.isDifferentPipeNet(pipeTile, tileEntity)) {
+                continue; // same net: segments already share the tank
             }
             IFluidHandler sourceHandler = pipeTile.getCapability(CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY, side);
             IFluidHandler receiverHandler = tileEntity.getCapability(CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY, side.getOpposite());
-            if (sourceHandler != null && receiverHandler != null && blockFluidPipe.canPushIntoFluidHandler(pipeTile, tileEntity, sourceHandler, receiverHandler)) {
+            if (sourceHandler == null || receiverHandler == null) {
+                continue;
+            }
+            if (otherIsPipe) {
+                int amount = blockFluidPipe.getAmountToMove(pipeTile, tileEntity);
+                if (amount > 0) {
+                    GTFluidUtils.transferFluids(sourceHandler, receiverHandler, amount);
+                }
+            } else if (blockFluidPipe.canPushIntoFluidHandler(pipeTile, tileEntity, sourceHandler, receiverHandler)) {
                 GTFluidUtils.transferFluids(sourceHandler, receiverHandler, Integer.MAX_VALUE);
             }
+
         }
         blockPos.release();
     }
