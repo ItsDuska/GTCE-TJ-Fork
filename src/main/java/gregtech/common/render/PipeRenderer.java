@@ -87,7 +87,7 @@ public abstract class PipeRenderer implements ICCBlockRenderer, IItemRenderer {
         return renderType;
     }
 
-    public abstract void registerIcon(TextureMap texMap);
+    public void registerIcon(TextureMap texMap) {}
 
     @SubscribeEvent
     public void onModelsBake(ModelBakeEvent event) {

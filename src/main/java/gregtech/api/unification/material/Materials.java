@@ -835,6 +835,24 @@ public class Materials {
 
         Plastic.setFluidPipeProperties(200, 350, true);
         Polytetrafluoroethylene.setFluidPipeProperties(200, 600, true);
+
+        Americium.setItemPipeProperties(96,32*64);
+        Cobalt.setItemPipeProperties(3840, 64);
+        Nickel.setItemPipeProperties(3072, 32);
+        Osmium.setItemPipeProperties(384, 4*64);
+        Platinum.setItemPipeProperties(768, 2*64);
+        Tin.setItemPipeProperties(6444, 16);
+        Brass.setItemPipeProperties(3072, 32);
+        Cupronickel.setItemPipeProperties(3072, 32);
+        Electrum.setItemPipeProperties(1536, 64);
+        Magnalium.setItemPipeProperties(1536, 64);
+        SterlingSilver.setItemPipeProperties(1536, 64);
+        RoseGold.setItemPipeProperties(1536, 64);
+        BlackBronze.setItemPipeProperties(1536, 64);
+        Ultimet.setItemPipeProperties(192, 8*64);
+        Osmiridium.setItemPipeProperties(96, 16*64);
+        PolyvinylChloride.setItemPipeProperties(768, 2*64);
+        CobaltBrass.setItemPipeProperties(3072,32);
     }
 
 }
