@@ -11,7 +11,7 @@ import net.minecraft.world.World;
 import net.minecraft.world.WorldServer;
 
 
-public class RoutePath {
+public class CableRoutePath {
 
     public final BlockPos destination;
     public final Node<WireProperties> destinationNode;
@@ -22,7 +22,7 @@ public class RoutePath {
     private final int leaf;
 
 
-    public RoutePath(RouteTree tree, int leaf, Node<WireProperties> destinationNode, BlockPos destination, int totalLoss, int minVoltage) {
+    public CableRoutePath(RouteTree tree, int leaf, Node<WireProperties> destinationNode, BlockPos destination, int totalLoss, int minVoltage) {
         this.tree = tree;
         this.leaf = leaf;
         this.destinationNode = destinationNode;

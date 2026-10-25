@@ -41,9 +41,9 @@ public class EnergyNet extends PipeNet<WireProperties> {
         }
     }
 
-    public List<RoutePath> computePatches(BlockPos startPos) {
+    public List<CableRoutePath> computePatches(BlockPos startPos) {
         Node<WireProperties> rootNode = getNodeAt(startPos);
-        List<RoutePath> routes = new ArrayList<>();
+        List<CableRoutePath> routes = new ArrayList<>();
 
         if (rootNode == null) {
             return routes;
@@ -68,7 +68,7 @@ public class EnergyNet extends PipeNet<WireProperties> {
 
             if (candidate.parent < 0 || candidate.node.isActive) {
                 tree.markUsed(index);
-                routes.add(new RoutePath(tree, index, candidate.node, candidate.pos, candidate.loss, candidate.minVoltage));
+                routes.add(new CableRoutePath(tree, index, candidate.node, candidate.pos, candidate.loss, candidate.minVoltage));
             }
 
             for (EnumFacing facing : EnumFacing.VALUES) {

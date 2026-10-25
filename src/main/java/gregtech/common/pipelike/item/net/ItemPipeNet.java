@@ -1,8 +1,6 @@
 package gregtech.common.pipelike.item.net;
 
-import gregtech.api.pipenet.Node;
-import gregtech.api.pipenet.PipeNet;
-import gregtech.api.pipenet.WorldPipeNet;
+import gregtech.api.pipenet.*;
 import gregtech.api.pipenet.tile.IPipeTile;
 import gregtech.common.pipelike.item.ItemPipeProperties;
 import net.minecraft.item.ItemStack;
@@ -18,17 +16,22 @@ import net.minecraftforge.items.ItemHandlerHelper;
 import javax.annotation.Nullable;
 import java.util.*;
 
-public class ItemPipeNet extends PipeNet<ItemPipeProperties> {
-    private static final Comparator<Candidate> DIJKSTRA_ORDER = Comparator.<Candidate>comparingInt(c -> c.cost)
-            .thenComparingInt(c -> c.hops)
-            .thenComparingInt(c -> c.sequence);
-
-    private final Map<BlockPos, Bucket> pipeBuckets = new HashMap<>();
-    private final Map<BlockPos, List<ItemRoutePath>> routeCache = new HashMap<>();
+public class ItemPipeNet extends RoutedPipeNet<ItemPipeProperties> {
 
     public ItemPipeNet(WorldPipeNet<ItemPipeProperties, ItemPipeNet> world) {
         super(world);
     }
+
+    @Override
+    protected int getCost(Node<ItemPipeProperties> node) {
+        return Math.max(1, node.data.getPriority());
+    }
+
+    @Override
+    protected int getLimit(Node<ItemPipeProperties> node) {
+        return node.data.getItemsPerSecond();
+    }
+
 
     public ItemStack insert(BlockPos sourcePipePos, @Nullable EnumFacing sourceSide, ItemStack stack, boolean simulate) {
         Node<ItemPipeProperties> sourceNode = getNodeAt(sourcePipePos);
@@ -46,7 +49,7 @@ public class ItemPipeNet extends PipeNet<ItemPipeProperties> {
         List<Runnable> undo = new ArrayList<>();
 
         ItemStack remaining = stack.copy();
-        for (ItemRoutePath route : getRoutes(sourcePipePos)) {
+        for (RoutePath route : getRoutes(sourcePipePos)) {
             if (remaining.isEmpty() || sourceBucket.available(now, sourceRate) <= 0) {
                 break;
             }
@@ -120,78 +123,6 @@ public class ItemPipeNet extends PipeNet<ItemPipeProperties> {
         return remaining;
     }
 
-    private List<ItemRoutePath> getRoutes(BlockPos sourcePipePos) {
-        return routeCache.computeIfAbsent(sourcePipePos.toImmutable(), this::computeRoutes);
-    }
-
-    private List<ItemRoutePath> computeRoutes(BlockPos startPos) {
-        Node<ItemPipeProperties> rootNode = getNodeAt(startPos);
-        if (rootNode == null) {
-            return Collections.emptyList();
-        }
-
-        List<ItemRoutePath> routes = new ArrayList<>();
-        Set<BlockPos> settled = new HashSet<>();
-        PriorityQueue<Candidate> queue = new PriorityQueue<>(DIJKSTRA_ORDER);
-        BlockPos.MutableBlockPos probe = new BlockPos.MutableBlockPos();
-        int sequence = 0;
-
-        queue.add(new Candidate(startPos, rootNode, null, cost(rootNode), 0, sequence++));
-
-        while (!queue.isEmpty()) {
-            Candidate candidate = queue.poll();
-            if (!settled.add(candidate.pos)) {
-                continue;
-            }
-
-            ItemRoutePath.Step step = new ItemRoutePath.Step(getPipeBucket(candidate.pos), candidate.node.data.getItemsPerSecond(), candidate.parent);
-
-            if (candidate.node.isActive) {
-                routes.add(new ItemRoutePath(candidate.pos, step));
-            }
-
-            for (EnumFacing face : EnumFacing.VALUES) {
-                probe.setPos(candidate.pos).move(face);
-                if (settled.contains(probe)) {
-                    continue;
-                }
-
-                Node<ItemPipeProperties> next = getNodeAt(probe);
-                if (next == null || !canNodesConnect(candidate.node, face, next, this)) {
-                    continue;
-                }
-
-                queue.add(new Candidate(probe.toImmutable(), next, step, candidate.cost + cost(next), candidate.hops + 1, sequence++));
-            }
-        }
-
-        return routes;
-    }
-
-    private static int cost(Node<ItemPipeProperties> node) {
-        return Math.max(1, node.data.getPriority());
-    }
-
-    public Bucket getPipeBucket(BlockPos pipePos) {
-        return pipeBuckets.computeIfAbsent(pipePos.toImmutable(), pos -> new Bucket());
-    }
-
-    public void invalidateRoutes() {
-        routeCache.clear();
-    }
-
-    @Override
-    protected void onConnectionsUpdate() {
-        super.onConnectionsUpdate();
-        invalidateRoutes();
-    }
-
-    @Override
-    protected Node<ItemPipeProperties> removeNodeWithoutRebuilding(BlockPos nodePos) {
-        pipeBuckets.remove(nodePos);
-        invalidateRoutes();
-        return super.removeNodeWithoutRebuilding(nodePos);
-    }
 
     @Override
     protected void writeNodeData(ItemPipeProperties nodeData, NBTTagCompound tagCompound) {
@@ -206,22 +137,4 @@ public class ItemPipeNet extends PipeNet<ItemPipeProperties> {
         return new ItemPipeProperties(priority, rate);
     }
 
-
-    private static final class Candidate {
-        final BlockPos pos;
-        final Node<ItemPipeProperties> node;
-        final ItemRoutePath.Step parent;
-        final int cost;
-        final int hops;
-        final int sequence;
-
-        Candidate(BlockPos pos, Node<ItemPipeProperties> node, ItemRoutePath.Step parent, int cost, int hops, int sequence) {
-            this.pos = pos;
-            this.node = node;
-            this.parent = parent;
-            this.cost = cost;
-            this.hops = hops;
-            this.sequence = sequence;
-        }
-    }
 }

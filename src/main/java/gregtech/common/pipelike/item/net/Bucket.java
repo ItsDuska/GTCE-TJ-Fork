@@ -6,7 +6,6 @@ public class Bucket {
     private long window = Long.MIN_VALUE;
     private int used;
 
-
     public int available(long now, int itemsPerSecond) {
         rollWindow(now);
         return Math.max(0, itemsPerSecond - used);

@@ -40,6 +40,10 @@ public class ItemPipeItemHandler implements IItemHandler {
     @Override
     @NotNull
     public ItemStack insertItem(int slot, @NotNull ItemStack stack, boolean simulate) {
+        if (side != null && pipeTile.isSideBlocked(side)) {
+            return stack;
+        }
+
         ItemPipeNet net = getItemPipeNet();
         if (net == null) {
             return stack;

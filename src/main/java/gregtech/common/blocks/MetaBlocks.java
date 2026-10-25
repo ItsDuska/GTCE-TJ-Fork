@@ -17,6 +17,7 @@ import gregtech.api.unification.material.type.Material;
 import gregtech.api.unification.material.type.SolidMaterial;
 import gregtech.api.unification.ore.OrePrefix;
 import gregtech.api.unification.ore.StoneType;
+import gregtech.api.unification.ore.integration.EBTStones;
 import gregtech.common.blocks.foam.BlockFoam;
 import gregtech.common.blocks.foam.BlockPetrifiedFoam;
 import gregtech.common.blocks.modelfactories.BakedModelHandler;
@@ -64,6 +65,7 @@ import net.minecraftforge.client.model.ModelLoader;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fluids.BlockFluidBase;
 import net.minecraftforge.fml.client.registry.ClientRegistry;
+import net.minecraftforge.fml.common.Loader;
 import net.minecraftforge.fml.common.registry.GameRegistry;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
@@ -173,6 +175,11 @@ public class MetaBlocks {
 
         SURFACE_ROCK_NEW = new BlockSurfaceRockNew();
         SURFACE_ROCK_NEW.setRegistryName("surface_rock_new");
+
+        if (Loader.isModLoaded("ebt")) {
+            System.out.println("AMOGUS");
+            EBTStones.init();
+        }
 
         StoneType.init();
 

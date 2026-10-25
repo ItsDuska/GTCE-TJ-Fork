@@ -72,7 +72,7 @@ public final class RouteTree {
         }
 
         for (BlockPos pos : overloaded) {
-            RoutePath.burnCable(world, pos);
+            CableRoutePath.burnCable(world, pos);
         }
 
         return true;
