@@ -58,11 +58,6 @@ public class DebugPipeNetInfoProvider implements IProbeInfoProvider {
                     probeInfo.text(builder.toString());
                 }
                 probeInfo.text("tile blocked: " + pipeTile.getUnconnectedSides());
-                if (blockPipe instanceof BlockFluidPipe) {
-                    if (pipeTile instanceof TileEntityFluidPipeTickable) {
-                        probeInfo.text("tile active: " + ((TileEntityFluidPipeTickable) pipeTile).isActive());
-                    }
-                }
             }
         }
     }

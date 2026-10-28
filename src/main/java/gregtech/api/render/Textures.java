@@ -300,18 +300,32 @@ public class Textures {
         PipeRenderer.initializeRestrictor(textureMap);
     }
 
-    @SideOnly(Side.CLIENT)
-    public static void renderFace(CCRenderState renderState, Matrix4 translation, IVertexOperation[] ops,
-                                  EnumFacing face, Cuboid6 bounds, TextureAtlasSprite sprite, BlockRenderLayer layer) {
-        CubeRendererState state = RENDER_STATE.get();
-        if (layer != null && state != null && state.layer != null && (state.layer != layer || !state.shouldSideBeRendered(face, bounds))) {
+    public static void renderFace(CCRenderState renderState, Matrix4 translation, IVertexOperation[] ops, EnumFacing face, Cuboid6 bounds, TextureAtlasSprite sprite) {
+        if (MetaTileEntityRenderer.useBloom()) {
+             if (BloomRenderUtils.isBloomPass(RENDER_STATE.get())) {
+                 return;
+             }
+        }
+
+        drawFace(renderState, translation, ops, face, bounds, sprite);
+    }
+
+    public static void renderFace(CCRenderState renderState, Matrix4 translation, IVertexOperation[] ops, EnumFacing face, Cuboid6 bounds, TextureAtlasSprite sprite, BlockRenderLayer layer) {
+        if (layer == null) {
+            renderFace(renderState, translation, ops, face, bounds, sprite);
             return;
         }
-        renderFace(renderState, translation, ops, face, bounds, sprite);
+
+        CubeRendererState state = RENDER_STATE.get();
+        if (state != null && state.layer != null && (state.layer != layer || !state.shouldSideBeRendered(face, bounds))) {
+            return;
+        }
+
+        drawFace(renderState, translation, ops, face, bounds, sprite);
     }
 
     @SideOnly(Side.CLIENT)
-    public static void renderFace(CCRenderState renderState, Matrix4 translation, IVertexOperation[] ops,
+    public static void drawFace(CCRenderState renderState, Matrix4 translation, IVertexOperation[] ops,
                                   EnumFacing face, Cuboid6 bounds, TextureAtlasSprite sprite) {
         int side = face.getIndex();
         BlockFace blockFace = isFull(bounds) ? fullCubeFaces.get()[side] : blockFaces.get().loadCuboidFace(bounds, side);

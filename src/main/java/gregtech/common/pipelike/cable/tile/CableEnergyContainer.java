@@ -24,6 +24,7 @@ public class CableEnergyContainer implements IEnergyContainer {
     private WeakReference<EnergyNet> currentEnergyNet = new WeakReference<>(null);
     private long lastCachedUpdate;
     private List<CableRoutePath> pathsCache;
+    private WeakReference<EnergyNet> pathsCacheNet = new WeakReference<>(null);
 
     public CableEnergyContainer(IPipeTile<Insulation, WireProperties> tileEntityCable) {
         this.tileEntityCable = tileEntityCable;
@@ -154,7 +155,11 @@ public class CableEnergyContainer implements IEnergyContainer {
     }
 
     private List<CableRoutePath> getPaths(EnergyNet energyNet) {
-        if (pathsCache == null || energyNet.getLastUpdate() != lastCachedUpdate) {
+        if (pathsCache == null
+                || pathsCacheNet.get() != energyNet
+                || energyNet.getLastUpdate() != lastCachedUpdate
+        ) {
+            pathsCacheNet = new WeakReference<>(energyNet);
             lastCachedUpdate = energyNet.getLastUpdate();
             pathsCache = energyNet.computePatches(tileEntityCable.getPipePos());
         }

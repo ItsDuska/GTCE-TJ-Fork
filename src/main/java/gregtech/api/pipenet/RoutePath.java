@@ -1,6 +1,5 @@
 package gregtech.api.pipenet;
 
-import gregtech.common.pipelike.item.net.Bucket;
 import net.minecraft.util.math.BlockPos;
 
 public class RoutePath {
@@ -30,15 +29,24 @@ public class RoutePath {
         }
     }
 
-    static final class Step {
-        final Bucket bucket;
-        final int limit;
-        final Step parent;
+    static public final class Step {
+        public final BlockPos pos;
+        public final Bucket bucket;
+        public final int limit;
+        public final Step parent;
 
-        Step(Bucket bucket, int limit, Step parent) {
+        Step(BlockPos pos, Bucket bucket, int limit, Step parent) {
+            this.pos = pos;
             this.bucket = bucket;
             this.limit = limit;
             this.parent = parent;
         }
+
+
     }
+
+    public Step last() {
+        return last;
+    }
+
 }

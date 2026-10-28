@@ -2,8 +2,6 @@ package gregtech.api.pipenet;
 
 
 import gregtech.api.pipenet.tile.IPipeTile;
-import gregtech.api.pipenet.RoutePath;
-import gregtech.common.pipelike.item.net.Bucket;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.math.BlockPos;
@@ -20,7 +18,6 @@ public abstract class RoutedPipeNet<T> extends PipeNet<T>{
 
     private final Map<BlockPos, Bucket> pipeBuckets = new HashMap<>();
     private final Map<BlockPos, List<RoutePath>> routeCache = new HashMap<>();
-
 
     protected RoutedPipeNet(WorldPipeNet<T, ? extends PipeNet<T>> world) {
         super(world);
@@ -63,7 +60,7 @@ public abstract class RoutedPipeNet<T> extends PipeNet<T>{
         return routeCache.computeIfAbsent(sourcePipePos.toImmutable(), this::computeRoutes);
     }
 
-    private List<RoutePath> computeRoutes(BlockPos startPos) {
+    protected List<RoutePath> computeRoutes(BlockPos startPos) {
         Node<T> rootNode = getNodeAt(startPos);
         if (rootNode == null) {
             return Collections.emptyList();
@@ -84,7 +81,7 @@ public abstract class RoutedPipeNet<T> extends PipeNet<T>{
                 continue;
             }
 
-            RoutePath.Step step = new RoutePath.Step(getPipeBucket(candidate.pos), getLimit(candidate.node), candidate.parent);
+            RoutePath.Step step = new RoutePath.Step(candidate.pos, getPipeBucket(candidate.pos), getLimit(candidate.node), candidate.parent);
 
             if (candidate.node.isActive) {
                 routes.add(new RoutePath(candidate.pos, step));

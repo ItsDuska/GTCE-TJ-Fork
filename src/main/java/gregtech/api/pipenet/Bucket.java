@@ -1,4 +1,4 @@
-package gregtech.common.pipelike.item.net;
+package gregtech.api.pipenet;
 
 public class Bucket {
     private static final int TICKS_PER_SECOND = 20;

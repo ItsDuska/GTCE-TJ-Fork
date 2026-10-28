@@ -210,13 +210,15 @@ public abstract class TileEntityPipeBase<PipeType extends Enum<PipeType> & IPipe
             return;
         }
 
-        connectionsInitialised = true;
+
         World world = getWorld();
         BlockPipe<PipeType, NodeDataType, ?> block = getPipeBlock();
 
         if (world.isRemote || block == null) {
             return;
         }
+
+        connectionsInitialised = true;
 
         for (EnumFacing side : EnumFacing.VALUES) {
             if (block.canAutoConnect(this, side)) {
