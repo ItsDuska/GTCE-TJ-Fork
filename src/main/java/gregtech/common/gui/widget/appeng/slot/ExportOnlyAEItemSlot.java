@@ -1,18 +1,22 @@
 package gregtech.common.gui.widget.appeng.slot;
 
 import appeng.api.storage.data.IAEItemStack;
+import gregtech.api.capability.IInventoryNotifiable;
+import gregtech.api.metatileentity.MetaTileEntity;
 import gregtech.common.metatileentities.electric.multiblockpart.appeng.slot.ExportOnlyAESlot;
 import gregtech.common.metatileentities.electric.multiblockpart.appeng.stack.WrappedItemStack;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraftforge.items.IItemHandlerModifiable;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.List;
 import java.util.function.Consumer;
 
-public class ExportOnlyAEItemSlot extends ExportOnlyAESlot<IAEItemStack> implements IItemHandlerModifiable {
+public class ExportOnlyAEItemSlot extends ExportOnlyAESlot<IAEItemStack> implements IItemHandlerModifiable, IInventoryNotifiable {
 
-    protected Consumer<Integer> trigger;
+    protected final List<MetaTileEntity> metaTileEntitiesToNotify = new ObjectArrayList<>();
 
     public ExportOnlyAEItemSlot(IAEItemStack config, IAEItemStack stock) {
         super(config, stock);
@@ -23,7 +27,6 @@ public class ExportOnlyAEItemSlot extends ExportOnlyAESlot<IAEItemStack> impleme
     }
 
     public void setTrigger(Consumer<Integer> trigger) {
-        this.trigger = trigger;
     }
 
     @Override
@@ -79,9 +82,7 @@ public class ExportOnlyAEItemSlot extends ExportOnlyAESlot<IAEItemStack> impleme
                     this.stock = null;
                 }
             }
-            if (this.trigger != null) {
-                this.trigger.accept(0);
-            }
+            this.notifyMetaTileEntities();
             return result;
         }
         return ItemStack.EMPTY;
@@ -114,24 +115,44 @@ public class ExportOnlyAEItemSlot extends ExportOnlyAESlot<IAEItemStack> impleme
         } else {
             this.stock.add(stack);
         }
-        this.trigger.accept(0);
+        this.notifyMetaTileEntities();
     }
 
     @Override
     public void setStack(IAEItemStack stack) {
+        ItemStack stockItem, itemToStock = null;
         if (this.stock == null && stack == null) {
             return;
         } else if (stack == null) {
             this.stock = null;
-        } else {
-            // todo this could maybe be improved with better comparison check
-            this.stock = WrappedItemStack.fromItemStack(stack.createItemStack());
-        }
-        this.trigger.accept(0);
+        } else if (this.stock == null || (stockItem = this.stock.createItemStack()).getItem() != (itemToStock = stack.createItemStack()).getItem() ||
+                stockItem.getMetadata() != itemToStock.getMetadata() || stockItem.getTagCompound() != itemToStock.getTagCompound()) {
+            // TODO NBT comparison not yet supported. GT machines don't handle NBT very well anyways.
+            this.stock = WrappedItemStack.fromItemStack(itemToStock != null ? itemToStock : stack.createItemStack());
+        } else if (stockItem.getCount() != itemToStock.getCount()) {
+            this.stock.setStackSize(stack.getStackSize());
+        } else return;
+        this.notifyMetaTileEntities();
     }
 
     @Override
     public int getSlotLimit(int slot) {
         return Integer.MAX_VALUE;
+    }
+
+    protected void notifyMetaTileEntities() {
+        for (MetaTileEntity metaTileEntity : this.metaTileEntitiesToNotify)
+            metaTileEntity.setInventoryNotified(true);
+    }
+
+    @Override
+    public void addMetaTileEntityToNotifiable(MetaTileEntity metaTileEntity) {
+        if (metaTileEntity != null)
+            this.metaTileEntitiesToNotify.add(metaTileEntity);
+    }
+
+    @Override
+    public void removeMetaTileEntityFromNotifiable(MetaTileEntity metaTileEntity) {
+        this.metaTileEntitiesToNotify.remove(metaTileEntity);
     }
 }
